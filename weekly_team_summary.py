@@ -21,6 +21,7 @@ import asyncio
 import sys
 import os
 import yaml
+import json
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
 from collections import defaultdict
@@ -29,14 +30,15 @@ from collections import defaultdict
 sys.path.insert(0, '.')
 
 from dotenv import load_dotenv
-from server import JiraMCPServer
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
 
 # Load environment variables
 load_dotenv()
 
 class WeeklyTeamSummary:
     def __init__(self, config_file='team_config.yaml'):
-        self.server = None
+        self.client = None
         self.config = self._load_config(config_file)
         self.base_jql = self.config['base_jql']
         self.team_categories = self.config['team_categories']
@@ -59,10 +61,21 @@ class WeeklyTeamSummary:
 
         
     async def initialize(self):
-        """Initialize the Jira MCP server connection"""
-        self.server = JiraMCPServer()
-        await self.server._init_jira_client()
-        print("✅ Connected to Jira")
+        """Initialize the MCP client connection to the Jira server"""
+        try:
+            # Connect to the MCP server
+            server_params = StdioServerParameters(
+                command="python3",
+                args=["../jira-mcp-server/server.py"]
+            )
+            
+            self.server_params = server_params
+            print("✅ MCP server parameters configured")
+                    
+        except Exception as e:
+            print(f"❌ Failed to configure MCP server: {e}")
+            print("Make sure the jira-mcp-server is properly configured and accessible.")
+            raise
         
     def build_jql_with_dates(self, start_date: str, end_date: str) -> str:
         """Build JQL query with date range filter"""
@@ -84,16 +97,70 @@ class WeeklyTeamSummary:
         return ' AND '.join(filters) + f' ORDER BY {order_by}'
         
     async def fetch_tickets(self, start_date: str, end_date: str) -> List[Any]:
-        """Fetch tickets for the specified date range"""
+        """Fetch tickets for the specified date range using MCP client"""
         jql = self.build_jql_with_dates(start_date, end_date)
         print(f"🔍 Searching tickets from {start_date} to {end_date}...")
         
         try:
-            # Get max results from config
-            max_results = self.config.get('report_settings', {}).get('max_results', 200)
-            issues = self.server.jira_client.search_issues(jql, maxResults=max_results)
-            print(f"📊 Found {len(issues)} tickets")
-            return issues
+            # Connect to MCP server and fetch tickets
+            async with stdio_client(self.server_params) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    
+                    # Use MCP client to search issues
+                    result = await session.call_tool(
+                        "search_issues",
+                        {
+                            "jql": jql,
+                            "max_results": self.config.get('report_settings', {}).get('max_results', 200)
+                        }
+                    )
+                    
+                    # Parse the result
+                    if result.content and len(result.content) > 0:
+                        response_text = result.content[0].text
+                        print(f"📊 MCP Response received")
+                        
+                        # The MCP server returns formatted text, not JSON
+                        # We need to extract ticket information from the text
+                        if "Found" in response_text and "issue(s)" in response_text:
+                            # Extract ticket count
+                            import re
+                            count_match = re.search(r'Found (\d+) issue\(s\)', response_text)
+                            if count_match:
+                                count = int(count_match.group(1))
+                                print(f"📊 Found {count} tickets")
+                                
+                                # Extract ticket details using regex
+                                tickets = []
+                                ticket_pattern = r'• \*\*([A-Z]+-\d+)\*\* - (.+?)\n  Status: ([^|]+) \| Assignee: ([^\n]+)'
+                                matches = re.findall(ticket_pattern, response_text, re.DOTALL)
+                                
+                                for match in matches:
+                                    ticket_key, summary, status, assignee = match
+                                    tickets.append({
+                                        'key': ticket_key,
+                                        'fields': {
+                                            'summary': summary.strip(),
+                                            'status': {'name': status.strip()},
+                                            'assignee': {'displayName': assignee.strip()} if assignee.strip() != 'Unassigned' else None,
+                                            'priority': {'name': 'Medium'},  # Default priority
+                                            'components': [],
+                                            'updated': '2025-01-01T00:00:00.000+0000'  # Default date
+                                        }
+                                    })
+                                
+                                return tickets
+                            else:
+                                print("📊 No tickets found")
+                                return []
+                        else:
+                            print("📊 No tickets found")
+                            return []
+                    else:
+                        print("📊 No tickets found")
+                        return []
+                
         except Exception as e:
             print(f"❌ Error fetching tickets: {e}")
             return []
@@ -101,10 +168,10 @@ class WeeklyTeamSummary:
     def categorize_ticket(self, issue) -> str:
         """Categorize a ticket into one of the team categories"""
         # Get ticket details
-        components = [comp.name for comp in getattr(issue.fields, 'components', [])]
-        project = issue.fields.project.key
-        summary = issue.fields.summary.lower()
-        description = (issue.fields.description or "").lower()
+        components = [comp['name'] for comp in issue.get('fields', {}).get('components', [])]
+        project = issue.get('fields', {}).get('project', {}).get('key', '')
+        summary = issue.get('fields', {}).get('summary', '').lower()
+        description = issue.get('fields', {}).get('description', '').lower()
         
         # Check each category
         for category_name, rules in self.team_categories.items():
@@ -129,15 +196,16 @@ class WeeklyTeamSummary:
         
     def format_ticket_info(self, issue) -> Dict[str, str]:
         """Format ticket information for display"""
+        fields = issue.get('fields', {})
         return {
-            'key': issue.key,
-            'summary': issue.fields.summary,
-            'status': issue.fields.status.name,
-            'assignee': issue.fields.assignee.displayName if issue.fields.assignee else 'Unassigned',
-            'priority': issue.fields.priority.name if issue.fields.priority else 'None',
-            'components': [comp.name for comp in getattr(issue.fields, 'components', [])],
-            'updated': str(issue.fields.updated)[:10],  # Just the date part
-            'url': f"{self.server.jira_client.server_url}/browse/{issue.key}"
+            'key': issue.get('key', ''),
+            'summary': fields.get('summary', ''),
+            'status': fields.get('status', {}).get('name', 'Unknown'),
+            'assignee': fields.get('assignee', {}).get('displayName', 'Unassigned') if fields.get('assignee') else 'Unassigned',
+            'priority': fields.get('priority', {}).get('name', 'None') if fields.get('priority') else 'None',
+            'components': [comp['name'] for comp in fields.get('components', [])],
+            'updated': fields.get('updated', '')[:10],  # Just the date part
+            'url': f"https://issues.redhat.com/browse/{issue.get('key', '')}"
         }
     
     def format_table_row(self, ticket_info: Dict[str, str], title_width=50, assignee_width=20) -> str:
