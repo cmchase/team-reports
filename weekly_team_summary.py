@@ -17,11 +17,9 @@ Examples:
     python3 weekly_team_summary.py 2025-07-15 2025-07-22 custom_team_config.yaml
 """
 
-import asyncio
 import sys
 import os
 import yaml
-import json
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
 from collections import defaultdict
@@ -30,15 +28,14 @@ from collections import defaultdict
 sys.path.insert(0, '.')
 
 from dotenv import load_dotenv
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from jira import JIRA
 
 # Load environment variables
 load_dotenv()
 
 class WeeklyTeamSummary:
     def __init__(self, config_file='team_config.yaml'):
-        self.client = None
+        self.jira_client = None
         self.config = self._load_config(config_file)
         self.base_jql = self.config['base_jql']
         self.team_categories = self.config['team_categories']
@@ -60,21 +57,25 @@ class WeeklyTeamSummary:
             
 
         
-    async def initialize(self):
-        """Initialize the MCP client connection to the Jira server"""
+    def initialize(self):
+        """Initialize the Jira client connection"""
         try:
-            # Connect to the MCP server
-            server_params = StdioServerParameters(
-                command="python3",
-                args=["../jira-mcp-server/server.py"]
-            )
+            server = os.getenv("JIRA_SERVER")
+            email = os.getenv("JIRA_EMAIL")
+            api_token = os.getenv("JIRA_API_TOKEN")
             
-            self.server_params = server_params
-            print("✅ MCP server parameters configured")
-                    
+            if not server or not email or not api_token:
+                raise ValueError("Missing required environment variables: JIRA_SERVER, JIRA_EMAIL, JIRA_API_TOKEN")
+            
+            from jira.client import TokenAuth
+            self.jira_client = JIRA(
+                server=server,
+                token_auth=api_token
+            )
+            print("✅ Connected to Jira")
+            
         except Exception as e:
-            print(f"❌ Failed to configure MCP server: {e}")
-            print("Make sure the jira-mcp-server is properly configured and accessible.")
+            print(f"❌ Failed to connect to Jira: {e}")
             raise
         
     def build_jql_with_dates(self, start_date: str, end_date: str) -> str:
@@ -96,71 +97,18 @@ class WeeklyTeamSummary:
         
         return ' AND '.join(filters) + f' ORDER BY {order_by}'
         
-    async def fetch_tickets(self, start_date: str, end_date: str) -> List[Any]:
-        """Fetch tickets for the specified date range using MCP client"""
+    def fetch_tickets(self, start_date: str, end_date: str) -> List[Any]:
+        """Fetch tickets for the specified date range"""
         jql = self.build_jql_with_dates(start_date, end_date)
         print(f"🔍 Searching tickets from {start_date} to {end_date}...")
+        print(f"📝 JQL: {jql}")
         
         try:
-            # Connect to MCP server and fetch tickets
-            async with stdio_client(self.server_params) as (read, write):
-                async with ClientSession(read, write) as session:
-                    await session.initialize()
-                    
-                    # Use MCP client to search issues
-                    result = await session.call_tool(
-                        "search_issues",
-                        {
-                            "jql": jql,
-                            "max_results": self.config.get('report_settings', {}).get('max_results', 200)
-                        }
-                    )
-                    
-                    # Parse the result
-                    if result.content and len(result.content) > 0:
-                        response_text = result.content[0].text
-                        print(f"📊 MCP Response received")
-                        
-                        # The MCP server returns formatted text, not JSON
-                        # We need to extract ticket information from the text
-                        if "Found" in response_text and "issue(s)" in response_text:
-                            # Extract ticket count
-                            import re
-                            count_match = re.search(r'Found (\d+) issue\(s\)', response_text)
-                            if count_match:
-                                count = int(count_match.group(1))
-                                print(f"📊 Found {count} tickets")
-                                
-                                # Extract ticket details using regex
-                                tickets = []
-                                ticket_pattern = r'• \*\*([A-Z]+-\d+)\*\* - (.+?)\n  Status: ([^|]+) \| Assignee: ([^\n]+)'
-                                matches = re.findall(ticket_pattern, response_text, re.DOTALL)
-                                
-                                for match in matches:
-                                    ticket_key, summary, status, assignee = match
-                                    tickets.append({
-                                        'key': ticket_key,
-                                        'fields': {
-                                            'summary': summary.strip(),
-                                            'status': {'name': status.strip()},
-                                            'assignee': {'displayName': assignee.strip()} if assignee.strip() != 'Unassigned' else None,
-                                            'priority': {'name': 'Medium'},  # Default priority
-                                            'components': [],
-                                            'updated': '2025-01-01T00:00:00.000+0000'  # Default date
-                                        }
-                                    })
-                                
-                                return tickets
-                            else:
-                                print("📊 No tickets found")
-                                return []
-                        else:
-                            print("📊 No tickets found")
-                            return []
-                    else:
-                        print("📊 No tickets found")
-                        return []
-                
+            # Get max results from config
+            max_results = self.config.get('report_settings', {}).get('max_results', 200)
+            issues = self.jira_client.search_issues(jql, maxResults=max_results)
+            print(f"📊 Found {len(issues)} tickets")
+            return issues
         except Exception as e:
             print(f"❌ Error fetching tickets: {e}")
             return []
@@ -168,13 +116,19 @@ class WeeklyTeamSummary:
     def categorize_ticket(self, issue) -> str:
         """Categorize a ticket into one of the team categories"""
         # Get ticket details
-        components = [comp['name'] for comp in issue.get('fields', {}).get('components', [])]
-        project = issue.get('fields', {}).get('project', {}).get('key', '')
-        summary = issue.get('fields', {}).get('summary', '').lower()
-        description = issue.get('fields', {}).get('description', '').lower()
+        components = [comp.name for comp in getattr(issue.fields, 'components', [])]
+        project = issue.fields.project.key
+        summary = issue.fields.summary.lower()
+        description = (issue.fields.description or "").lower()
         
         # Check each category
         for category_name, rules in self.team_categories.items():
+            # Check keywords in summary/description
+            if 'keywords' in rules:
+                text_to_search = f"{summary} {description}"
+                if any(keyword in text_to_search for keyword in rules['keywords']):
+                    return category_name
+
             # Check components
             if 'components' in rules:
                 if any(comp in components for comp in rules['components']):
@@ -184,28 +138,22 @@ class WeeklyTeamSummary:
             if 'projects' in rules:
                 if project in rules['projects']:
                     return category_name
-                    
-            # Check keywords in summary/description
-            if 'keywords' in rules:
-                text_to_search = f"{summary} {description}"
-                if any(keyword in text_to_search for keyword in rules['keywords']):
-                    return category_name
-                    
+                 
+                
         # Default category for uncategorized tickets
         return 'Other'
         
     def format_ticket_info(self, issue) -> Dict[str, str]:
         """Format ticket information for display"""
-        fields = issue.get('fields', {})
         return {
-            'key': issue.get('key', ''),
-            'summary': fields.get('summary', ''),
-            'status': fields.get('status', {}).get('name', 'Unknown'),
-            'assignee': fields.get('assignee', {}).get('displayName', 'Unassigned') if fields.get('assignee') else 'Unassigned',
-            'priority': fields.get('priority', {}).get('name', 'None') if fields.get('priority') else 'None',
-            'components': [comp['name'] for comp in fields.get('components', [])],
-            'updated': fields.get('updated', '')[:10],  # Just the date part
-            'url': f"https://issues.redhat.com/browse/{issue.get('key', '')}"
+            'key': issue.key,
+            'summary': issue.fields.summary,
+            'status': issue.fields.status.name,
+            'assignee': issue.fields.assignee.displayName if issue.fields.assignee else 'Unassigned',
+            'priority': issue.fields.priority.name if issue.fields.priority else 'None',
+            'components': [comp.name for comp in getattr(issue.fields, 'components', [])],
+            'updated': str(issue.fields.updated)[:10],  # Just the date part
+            'url': f"{self.jira_client.server_url}/browse/{issue.key}"
         }
     
     def format_table_row(self, ticket_info: Dict[str, str], title_width=50, assignee_width=20) -> str:
@@ -297,12 +245,12 @@ class WeeklyTeamSummary:
         
         return "\n".join(report)
         
-    async def generate_weekly_summary(self, start_date: str, end_date: str) -> str:
+    def generate_weekly_summary(self, start_date: str, end_date: str) -> str:
         """Generate the complete weekly summary"""
-        await self.initialize()
+        self.initialize()
         
         # Fetch tickets
-        tickets = await self.fetch_tickets(start_date, end_date)
+        tickets = self.fetch_tickets(start_date, end_date)
         
         if not tickets:
             return f"No tickets found for the period {start_date} to {end_date}"
@@ -338,7 +286,7 @@ def parse_date_args():
         
     return start_date, end_date
 
-async def main():
+def main():
     """Main function"""
     try:
         start_date, end_date = parse_date_args()
@@ -353,7 +301,7 @@ async def main():
             print(f"📝 Using custom config file: {config_file}")
         
         summary_generator = WeeklyTeamSummary(config_file)
-        report = await summary_generator.generate_weekly_summary(start_date, end_date)
+        report = summary_generator.generate_weekly_summary(start_date, end_date)
         
         # Create Reports directory if it doesn't exist
         reports_dir = "Reports"
@@ -375,4 +323,4 @@ async def main():
         sys.exit(1)
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    main() 

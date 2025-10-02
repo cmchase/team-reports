@@ -11,6 +11,7 @@ A powerful tool for generating automated weekly team summaries from Jira tickets
 - **⚙️ Customizable Configuration** - YAML-based configuration for easy customization
 - **🔍 Advanced Filtering** - Exclude specific statuses and filter by assignees
 - **📁 Organized Output** - Reports saved in dedicated Reports folder
+- **🔗 Direct Jira Integration** - Built-in Jira API integration for seamless data access
 
 ## 🚀 Quick Start
 
@@ -19,21 +20,13 @@ A powerful tool for generating automated weekly team summaries from Jira tickets
 - Python 3.8 or higher
 - Jira account with API access
 - Jira API token
-- **Jira MCP Server** - Required for Jira API integration
 
-### 🔗 Jira MCP Server Setup
+### Setup Steps
 
-This project requires the **Jira MCP Server** to function. The MCP server provides the Jira API integration layer.
-
-**Option 1: Use the Official Jira MCP Server**
-- Clone and setup: [jira-mcp-server](https://github.com/sthirugn/jira-mcp-server)
-- Follow the setup instructions in that repository
-- Ensure the MCP server is running and accessible
-
-**Option 2: Use Your Own MCP Server**
-- If you have your own Jira MCP server implementation
-- Ensure it provides the required Jira API functionality
-- Configure the connection settings accordingly
+1. **Install Dependencies** - Install required Python packages
+2. **Configure Jira Credentials** - Set up your Jira API access
+3. **Configure Team Settings** - Customize your team's configuration
+4. **Generate Reports** - Start creating weekly summaries
 
 ### 1. Install Dependencies
 
@@ -51,7 +44,11 @@ JIRA_EMAIL=your-email@company.com
 JIRA_API_TOKEN=your-api-token
 ```
 
-**Note:** These credentials are used by the Jira MCP Server. Make sure the MCP server is configured with the same credentials.
+**Getting your Jira API Token:**
+1. Go to your Jira account settings
+2. Navigate to Security → API tokens
+3. Create a new API token
+4. Copy the token and add it to your `.env` file
 
 ### 3. Configure Team Settings
 
@@ -67,31 +64,17 @@ Edit `team_config.yaml` with your team's:
 - Categorization rules
 - Status filters
 
-### 4. Start the Jira MCP Server
-
-Before generating reports, ensure the Jira MCP Server is running:
-
-```bash
-# Navigate to your jira-mcp-server directory
-cd /path/to/jira-mcp-server
-
-# Start the MCP server
-python3 server.py
-```
-
-The MCP server should be running in the background while you generate reports.
-
-### 5. Generate Your First Report
+### 4. Generate Your First Report
 
 ```bash
 # Generate report for last 7 days
 python3 weekly_team_summary.py
 
 # Generate report for specific date range
-python3 weekly_team_summary.py 2025-01-01 2025-01-07
+python3 weekly_team_summary.py 2025-09-10 2025-09-16
 
 # Use the convenient shell script
-./run_weekly_summary.sh 2025-01-01 2025-01-07
+./run_weekly_summary.sh 2025-09-10 2025-09-16
 ```
 
 ## 📁 Project Structure
@@ -99,6 +82,7 @@ python3 weekly_team_summary.py 2025-01-01 2025-01-07
 ```
 jira-weekly-reports/
 ├── weekly_team_summary.py     # Main report generator
+├── server.py                  # Built-in Jira API integration
 ├── run_weekly_summary.sh      # Convenient shell wrapper
 ├── team_config.yaml           # Your team configuration (create this)
 ├── team_config_example.yaml   # Example configuration
@@ -112,12 +96,13 @@ jira-weekly-reports/
 
 ## 🔗 Dependencies
 
-This project depends on the **Jira MCP Server** for Jira API integration:
+This project includes built-in Jira API integration:
 
-- **[jira-mcp-server](https://github.com/sthirugn/jira-mcp-server)** - Official Jira MCP Server
-  - Provides Jira API integration via Model Context Protocol
+- **Built-in Jira Integration** (`server.py`)
+  - Direct Jira API integration using the `jira` Python library
   - Handles authentication and API communication
-  - Must be running when generating reports
+  - No external dependencies or separate server processes required
+  - Uses your Jira credentials from the `.env` file
 
 ## 🎯 Usage Examples
 
@@ -128,7 +113,7 @@ This project depends on the **Jira MCP Server** for Jira API integration:
 python3 weekly_team_summary.py
 
 # Generate report for specific date range
-python3 weekly_team_summary.py 2025-01-01 2025-01-07
+python3 weekly_team_summary.py 2025-09-10 2025-09-16
 
 # Generate report for current week
 python3 weekly_team_summary.py $(date -d "monday" +%Y-%m-%d) $(date -d "friday" +%Y-%m-%d)
@@ -144,7 +129,7 @@ chmod +x run_weekly_summary.sh
 ./run_weekly_summary.sh
 
 # Generate report for specific date range
-./run_weekly_summary.sh 2025-01-01 2025-01-07
+./run_weekly_summary.sh 2025-09-10 2025-09-16
 ```
 
 ## 📊 Report Output
@@ -154,28 +139,27 @@ Reports are generated in Markdown format and include:
 - **📅 Date Range** - Clear indication of the reporting period
 - **📈 Summary Statistics** - Total tickets, categories breakdown
 - **🏷️ Categorized Sections** - Tickets organized by your defined categories
-- **📋 Ticket Details** - Key, summary, status, assignee, and URL
+- **📋 Ticket Details** - Key, summary, status, assignee, priority, and URL
 - **📁 Organized Storage** - Reports saved in `Reports/` folder
 
 ### Example Report Structure
 
 ```markdown
-# Weekly Team Summary
-**Date Range:** 2025-01-01 to 2025-01-07
+# 📊 WEEKLY TEAM SUMMARY: 2025-09-10 to 2025-09-16
 
-## 📊 Summary
-- **Total Tickets:** 25
-- **Categories:** 4
+## 📈 OVERVIEW
+- **Total Tickets:** 110
+- **Edge Decommission:** 16 tickets
+- **Remediations Core:** 53 tickets
+- **QE / Integrations:** 20 tickets
 
-## 🏷️ Backend Development
-| Ticket | Status | Assignee | Title |
-|--------|--------|----------|-------|
-| [PROJ-123](url) | In Progress | John Doe | Implement new API endpoint |
+### 🎯 REMEDIATIONS CORE - Remediations, Frontend
 
-## 🏷️ Frontend Development
-| Ticket | Status | Assignee | Title |
-|--------|--------|----------|-------|
-| [PROJ-124](url) | Done | Jane Smith | Update user interface |
+#### 📌 In Progress (5 tickets)
+
+| Ticket ID | Assignee | Priority | Updated | Title |
+|-----------|----------|----------|---------|-------|
+| [PROJ-123](url) | John Doe | Major | 2025-09-13 | Implement new API endpoint |
 ```
 
 ## ⚙️ Configuration
@@ -201,7 +185,12 @@ team_categories:
 
 # Status filters
 status_filters:
-  exclude: ["New", "Backlog"]
+  exclude: ["New", "Backlog", "Refinement"]
+
+# Report settings
+report_settings:
+  max_results: 200
+  order_by: "component ASC, updated DESC"
 ```
 
 ### Environment Variables (`.env`)
@@ -239,7 +228,7 @@ base_jql: |
 
 - **[WEEKLY_SUMMARY_README.md](WEEKLY_SUMMARY_README.md)** - Detailed usage guide
 - **[CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)** - Advanced configuration options
-- **[jira-mcp-server](https://github.com/sthirugn/jira-mcp-server)** - Jira MCP Server documentation and setup
+- **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** - Implementation guide for AI assistants and developers
 
 ## 🔒 Security
 
@@ -252,17 +241,16 @@ base_jql: |
 
 ### Common Issues
 
-1. **MCP Server Connection Error**
-   - Ensure the Jira MCP Server is running (`python3 server.py`)
-   - Check that the MCP server is accessible
-   - Verify the MCP server configuration matches your `.env` file
-   - See [jira-mcp-server troubleshooting](https://github.com/sthirugn/jira-mcp-server#troubleshooting)
+1. **Missing Environment Variables**
+   - Ensure `.env` file exists with correct Jira credentials
+   - Check that `JIRA_SERVER`, `JIRA_EMAIL`, and `JIRA_API_TOKEN` are set
+   - Verify the `.env` file is in the same directory as `weekly_team_summary.py`
 
 2. **Authentication Error**
    - Check your API token is correct
    - Ensure your email matches your Jira account
    - Verify token hasn't expired
-   - Confirm credentials are configured in both projects
+   - Test your Jira credentials by logging into Jira directly
 
 3. **No Tickets Found**
    - Check your JQL filter in `team_config.yaml`
@@ -275,6 +263,11 @@ base_jql: |
    - Check file permissions
    - Ensure all required fields are present
 
+5. **Import Errors**
+   - Ensure `server.py` is in the same directory as `weekly_team_summary.py`
+   - Check that all dependencies are installed: `pip install -r requirements.txt`
+   - Verify Python version is 3.8 or higher
+
 ### Debug Mode
 
 Enable debug logging by modifying the logging level in `weekly_team_summary.py`:
@@ -282,6 +275,13 @@ Enable debug logging by modifying the logging level in `weekly_team_summary.py`:
 ```python
 logging.basicConfig(level=logging.DEBUG)
 ```
+
+## 🆕 Recent Updates
+
+- **✅ Built-in Jira Integration** - No external dependencies or separate server processes required
+- **✅ Improved Data Handling** - Direct access to Jira Issue objects with full field information
+- **✅ Better Report Formatting** - Enhanced ticket details including proper priorities and statuses
+- **✅ Simplified Setup** - Create `.env` file with your Jira credentials and you're ready to go
 
 ## 🤝 Contributing
 
@@ -304,5 +304,6 @@ Your Jira Weekly Reports tool is now ready to use! You can:
 - ✅ Customize reports for your team
 - ✅ Export clean Markdown reports
 - ✅ Schedule regular reporting
+- ✅ Use built-in Jira API integration for seamless data access
 
 Start generating your first report and see how it transforms your team's Jira data into actionable insights! 🚀
