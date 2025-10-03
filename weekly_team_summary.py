@@ -27,11 +27,11 @@ sys.path.insert(0, '.')
 
 from dotenv import load_dotenv
 from jira import JIRA
-from ticket_utils import categorize_ticket, format_ticket_info
-from jira_utils import initialize_jira_client, fetch_tickets_for_date_range
-from date_utils import parse_date_args as parse_date_args_util
-from config_utils import load_config
-from report_utils import create_summary_report, save_report, generate_filename
+from utils.ticket import categorize_ticket, format_ticket_info
+from utils.jira import initialize_jira_client, fetch_tickets_for_date_range
+from utils.date import parse_date_args as parse_date_args_util
+from utils.config import load_config
+from utils.report import create_summary_report, save_report, generate_filename
 
 # Load environment variables
 load_dotenv()
