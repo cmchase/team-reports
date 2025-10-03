@@ -193,3 +193,98 @@ def validate_date_format(date_str: str) -> bool:
         return True
     except ValueError:
         return False
+
+
+def get_quarter_range(year: int, quarter: int) -> Tuple[str, str]:
+    """
+    Get the first and last day of a given quarter.
+    
+    Args:
+        year: Year (e.g., 2025)
+        quarter: Quarter number (1-4)
+        
+    Returns:
+        Tuple[str, str]: (first_day, last_day) in YYYY-MM-DD format
+        
+    Example:
+        start, end = get_quarter_range(2025, 1)
+        # Returns ("2025-01-01", "2025-03-31")
+    """
+    if quarter not in [1, 2, 3, 4]:
+        raise ValueError("Quarter must be 1, 2, 3, or 4")
+    
+    quarter_months = {
+        1: (1, 3),   # Q1: Jan-Mar
+        2: (4, 6),   # Q2: Apr-Jun  
+        3: (7, 9),   # Q3: Jul-Sep
+        4: (10, 12)  # Q4: Oct-Dec
+    }
+    
+    start_month, end_month = quarter_months[quarter]
+    start_date = datetime(year, start_month, 1)
+    
+    # Get last day of end_month
+    if end_month == 12:
+        last_day = datetime(year + 1, 1, 1) - timedelta(days=1)
+    else:
+        last_day = datetime(year, end_month + 1, 1) - timedelta(days=1)
+    
+    return start_date.strftime('%Y-%m-%d'), last_day.strftime('%Y-%m-%d')
+
+
+def get_current_quarter() -> Tuple[int, int, str, str]:
+    """
+    Get the current quarter information.
+    
+    Returns:
+        Tuple[int, int, str, str]: (year, quarter, start_date, end_date)
+        
+    Example:
+        year, quarter, start, end = get_current_quarter()
+        # Returns (2025, 4, "2025-10-01", "2025-12-31") for October 2025
+    """
+    today = datetime.now()
+    year = today.year
+    month = today.month
+    
+    if month <= 3:
+        quarter = 1
+    elif month <= 6:
+        quarter = 2
+    elif month <= 9:
+        quarter = 3
+    else:
+        quarter = 4
+    
+    start_date, end_date = get_quarter_range(year, quarter)
+    return year, quarter, start_date, end_date
+
+
+def parse_quarter_from_date(date_str: str) -> Tuple[int, int]:
+    """
+    Determine which quarter a date falls into.
+    
+    Args:
+        date_str: Date in YYYY-MM-DD format
+        
+    Returns:
+        Tuple[int, int]: (year, quarter)
+        
+    Example:
+        year, quarter = parse_quarter_from_date("2025-10-15")
+        # Returns (2025, 4)
+    """
+    date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+    year = date_obj.year
+    month = date_obj.month
+    
+    if month <= 3:
+        quarter = 1
+    elif month <= 6:
+        quarter = 2
+    elif month <= 9:
+        quarter = 3
+    else:
+        quarter = 4
+    
+    return year, quarter
