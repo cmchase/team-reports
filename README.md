@@ -185,7 +185,27 @@ team_categories:
 
 # Status filters
 status_filters:
-  exclude: ["New", "Backlog", "Refinement"]
+  all:
+    - "New"
+    - "Refinement"
+    - "To Do"
+    - "In Progress"
+    - "Review"
+    - "Closed"
+  planned_only:
+    - "New"
+    - "Refinement"
+    - "To Do"
+  executed_only:
+    - "In Progress"
+    - "Review"
+    - "Closed"
+  completed_only:
+    - "Closed"
+  exclude:
+    - "New"
+    - "Refinement"
+    - "To Do"
 
 # Report settings
 report_settings:
@@ -214,7 +234,7 @@ JIRA_API_TOKEN=your-api-token
 
 ```yaml
 status_filters:
-  exclude: ["New", "Backlog", "Refinement"]
+  exclude: ["New", "Refinement", "To Do"]
 ```
 
 ### Filtering by Assignee

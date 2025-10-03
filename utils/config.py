@@ -180,7 +180,7 @@ def get_default_config() -> Dict[str, Any]:
         'base_jql': '',
         'team_categories': {},
         'status_filters': {
-            'exclude': ['New', 'Backlog', 'Blocked']
+            'exclude': ['New', 'Refinement', 'To Do']
         },
         'report_settings': {
             'max_results': 200,

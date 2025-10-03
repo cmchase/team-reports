@@ -61,12 +61,17 @@ def build_jql_with_dates(base_jql: str, start_date: str, end_date: str,
     Returns:
         str: Complete JQL query with date filters and ordering
         
+    Status Filter Logic:
+        Uses config['status_filters']['executed_only'] to include only tickets
+        in active/completed work states (e.g., "In Progress", "Review", "Closed").
+        This focuses reports on actual work progress rather than planning tickets.
+        
     Example:
         jql = build_jql_with_dates(
             "project = MYPROJ AND assignee = currentUser()",
             "2025-01-01", 
             "2025-01-07",
-            {"status_filters": {"exclude": ["Closed", "Done"]}}
+            {"status_filters": {"executed_only": ["In Progress", "Review", "Closed"]}}
         )
     """
     date_filter = f'updated >= "{start_date}" AND updated <= "{end_date}"'
@@ -74,12 +79,12 @@ def build_jql_with_dates(base_jql: str, start_date: str, end_date: str,
     # Build filter components
     filters = [f'({base_jql})', f'({date_filter})']
     
-    # Add status filter if configured
-    if config and 'status_filters' in config and 'exclude' in config['status_filters']:
-        excluded_statuses = config['status_filters']['exclude']
-        if excluded_statuses:
-            status_list = ', '.join([f'"{status}"' for status in excluded_statuses])
-            status_filter = f'status NOT IN ({status_list})'
+    # Add status filter if configured - use include approach for executed work
+    if config and 'status_filters' in config and 'executed_only' in config['status_filters']:
+        included_statuses = config['status_filters']['executed_only']
+        if included_statuses:
+            status_list = ', '.join([f'"{status}"' for status in included_statuses])
+            status_filter = f'status IN ({status_list})'
             filters.append(f'({status_filter})')
     
     # Get order by from config or use default

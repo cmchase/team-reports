@@ -14,7 +14,7 @@
 ```sql
 (
     [base_jql from team_config.yaml]
-) AND updated >= "YYYY-MM-DD" AND updated <= "YYYY-MM-DD" AND status NOT IN ("New", "Backlog", "Blocked") ORDER BY [order_by from config]
+) AND updated >= "YYYY-MM-DD" AND updated <= "YYYY-MM-DD" AND status NOT IN ("New", "Refinement", "To Do") ORDER BY [order_by from config]
 ```
 
 ### 3. Step-by-Step Process
@@ -37,7 +37,7 @@ read_file team_config.yaml
     project in (PROJ, PROJ2, PROJ3, PROJ4) AND assignee in ("user@company.com")
 ) OR (
     project = PROJ AND "QA Contact" in ("user@company.com")
-) AND updated >= "2024-09-16" AND updated <= "2024-09-24" AND status NOT IN ("New", "Backlog", "Blocked") ORDER BY component ASC, updated DESC
+) AND updated >= "2024-09-16" AND updated <= "2024-09-24" AND status NOT IN ("New", "Refinement", "To Do") ORDER BY component ASC, updated DESC
 ```
 
 #### Step 4: Execute Search
