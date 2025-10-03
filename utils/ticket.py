@@ -82,6 +82,7 @@ def format_ticket_info(issue, jira_server_url: str, config: Optional[Dict[str, A
         - status: Current status name
         - assignee: Assignee display name or 'Unassigned'
         - priority: Priority name or 'None'
+        - story_points: Story points value (0 if not set)
         - components: List of component names
         - updated: Last updated date (YYYY-MM-DD format)
         - url: Direct link to the ticket
@@ -107,6 +108,7 @@ def format_ticket_info(issue, jira_server_url: str, config: Optional[Dict[str, A
         'assignee': assignee_display,
         'assignee_email': assignee_email or '',
         'priority': issue.fields.priority.name if issue.fields.priority else 'None',
+        'story_points': int(getattr(issue.fields, 'customfield_12310243', None) or getattr(issue.fields, 'storypoints', None) or 0),
         'components': [comp.name for comp in getattr(issue.fields, 'components', [])],
         'updated': str(issue.fields.updated)[:10],  # Just the date part
         'url': f"{jira_server_url}/browse/{issue.key}"

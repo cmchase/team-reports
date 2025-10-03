@@ -78,8 +78,9 @@ class QuarterlyTeamSummary:
         performance = {
             'contributor_tickets': defaultdict(list),        # Assignee -> List of tickets
             'contributor_counts': defaultdict(int),          # Assignee -> Total count
+            'contributor_story_points': defaultdict(int),    # Assignee -> Total story points
             'status_distribution': defaultdict(int),         # Status -> Count
-            'priority_distribution': defaultdict(int),       # Priority -> Count
+            'story_point_distribution': defaultdict(int),    # Story Points -> Count
             'monthly_activity': defaultdict(lambda: defaultdict(int)),  # Month -> Assignee -> Count
             'component_activity': defaultdict(int)           # Component -> Count
         }
@@ -93,10 +94,11 @@ class QuarterlyTeamSummary:
             # Track tickets per contributor
             performance['contributor_tickets'][assignee].append(ticket_info)
             performance['contributor_counts'][assignee] += 1
+            performance['contributor_story_points'][assignee] += ticket_info['story_points']
             
             # Track overall distributions
             performance['status_distribution'][ticket_info['status']] += 1
-            performance['priority_distribution'][ticket_info['priority']] += 1
+            performance['story_point_distribution'][ticket_info['story_points']] += 1
             
             # Extract monthly activity with error handling
             try:
@@ -118,14 +120,16 @@ class QuarterlyTeamSummary:
     
     def generate_quarterly_overview(self, performance: Dict[str, Any], year: int, quarter: int) -> List[str]:
         """Generate the quarterly overview section focused on contributor performance."""
-        # Calculate total ticket count and contributor count
+        # Calculate total ticket count, story points, and contributor count
         total_tickets = sum(performance['contributor_counts'].values())
+        total_story_points = sum(performance['contributor_story_points'].values())
         total_contributors = len(performance['contributor_counts'])
         
         # Start building the overview section with header and basic stats
         overview = [
             f"### 📊 Q{quarter} {year} CONTRIBUTOR OVERVIEW",
             f"- **Total Tickets Processed:** {total_tickets}",
+            f"- **Total Story Points Completed:** {total_story_points}",
             f"- **Active Contributors:** {total_contributors}",
             f"- **Quarter Period:** Q{quarter} {year}",
             ""
@@ -133,7 +137,7 @@ class QuarterlyTeamSummary:
         
         # Add top contributors by ticket count
         if performance['contributor_counts']:
-            overview.append("#### 🏆 Top Contributors by Ticket Count")
+            overview.append("#### 🏆 Top Contributors by Ticket Count & Story Points")
             # Sort contributors by ticket count and show all (or top 15 if too many)
             top_contributors = sorted(performance['contributor_counts'].items(), 
                                     key=lambda x: x[1], reverse=True)
@@ -142,7 +146,9 @@ class QuarterlyTeamSummary:
             display_count = min(15, len(top_contributors))
             for i, (contributor, count) in enumerate(top_contributors[:display_count], 1):
                 percentage = (count / total_tickets * 100) if total_tickets > 0 else 0
-                overview.append(f"{i}. **{contributor}:** {count} tickets ({percentage:.1f}%)")
+                story_points = performance['contributor_story_points'][contributor]
+                sp_percentage = (story_points / total_story_points * 100) if total_story_points > 0 else 0
+                overview.append(f"{i}. **{contributor}:** {count} tickets ({percentage:.1f}%) • {story_points} Points ({sp_percentage:.1f}%)")
             
             if len(top_contributors) > display_count:
                 overview.append(f"*... and {len(top_contributors) - display_count} more contributors*")
@@ -165,17 +171,25 @@ class QuarterlyTeamSummary:
         if not tickets:
             return []
             
+        # Calculate total story points for this contributor
+        total_story_points = sum(ticket['story_points'] for ticket in tickets)
+        
         # Start building contributor section
-        section = [f"### 👤 {contributor}", f"**Total Tickets:** {len(tickets)}", ""]
+        section = [
+            f"### 👤 {contributor}", 
+            f"**Total Tickets:** {len(tickets)}", 
+            f"**Total Story Points:** {total_story_points}",
+            ""
+        ]
         
         # Analyze tickets for this contributor
         status_breakdown = defaultdict(int)
-        priority_breakdown = defaultdict(int)
+        story_point_breakdown = defaultdict(int)
         
-        # Group tickets by status and priority
+        # Group tickets by status and story points
         for ticket in tickets:
             status_breakdown[ticket['status']] += 1
-            priority_breakdown[ticket['priority']] += 1
+            story_point_breakdown[ticket['story_points']] += 1
         
         # Show status distribution
         if status_breakdown:
@@ -185,12 +199,14 @@ class QuarterlyTeamSummary:
                 section.append(f"- **{status}:** {count} tickets ({percentage:.1f}%)")
             section.append("")
         
-        # Show priority distribution
-        if priority_breakdown:
-            section.append("#### ⚠️ Priority Breakdown")
-            for priority, count in sorted(priority_breakdown.items(), key=lambda x: x[1], reverse=True):
+        # Show story point distribution
+        if story_point_breakdown:
+            section.append("#### 📏 Story Point Breakdown")
+            for story_points, count in sorted(story_point_breakdown.items(), 
+                                            key=lambda x: x[0] if x[0] != 0 else float('inf')):
                 percentage = (count / len(tickets) * 100) if len(tickets) > 0 else 0
-                section.append(f"- **{priority}:** {count} tickets ({percentage:.1f}%)")
+                sp_label = f"{story_points} SP" if story_points > 0 else "No SP"
+                section.append(f"- **{sp_label}:** {count} tickets ({percentage:.1f}%)")
             section.append("")
         
         # Show recent tickets (limit to 15 for readability)
@@ -198,14 +214,14 @@ class QuarterlyTeamSummary:
         recent_tickets = sorted(tickets, key=lambda x: x['updated'], reverse=True)[:15]
         
         section.extend([
-            "| Ticket ID | Status | Priority | Updated | Title |",
-            "|-----------|--------|----------|---------|-------|"
+            "| Ticket ID | Status | Size | Updated | Title |",
+            "|-----------|--------|------|---------|-------|"
         ])
         
         for ticket in recent_tickets:
             # Truncate long titles for table formatting
             title = ticket['summary'][:60] + "..." if len(ticket['summary']) > 60 else ticket['summary']
-            section.append(f"| [{ticket['key']}]({ticket['url']}) | {ticket['status']} | {ticket['priority']} | {ticket['updated']} | {title} |")
+            section.append(f"| [{ticket['key']}]({ticket['url']}) | {ticket['status']} | {ticket['story_points']} | {ticket['updated']} | {title} |")
         
         if len(tickets) > 15:
             section.append(f"*... and {len(tickets) - 15} more tickets*")
@@ -221,15 +237,16 @@ class QuarterlyTeamSummary:
             ""
         ]
         
-        # Analyze overall priority distribution
-        if performance['priority_distribution']:
-            insights.append("#### ⚠️ Overall Priority Distribution")
-            total_tickets = sum(performance['priority_distribution'].values())
+        # Analyze overall story point distribution
+        if performance['story_point_distribution']:
+            insights.append("#### 📏 Overall Story Point Distribution")
+            total_tickets = sum(performance['story_point_distribution'].values())
             
-            for priority, count in sorted(performance['priority_distribution'].items(), 
-                                        key=lambda x: x[1], reverse=True):
+            for story_points, count in sorted(performance['story_point_distribution'].items(), 
+                                            key=lambda x: x[0] if x[0] != 0 else float('inf')):
                 percentage = (count / total_tickets * 100) if total_tickets > 0 else 0
-                insights.append(f"- **{priority}:** {count} tickets ({percentage:.1f}%)")
+                sp_label = f"{story_points} SP" if story_points > 0 else "No SP"
+                insights.append(f"- **{sp_label}:** {count} tickets ({percentage:.1f}%)")
             insights.append("")
         
         # Analyze component activity to identify focus areas
