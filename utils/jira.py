@@ -49,7 +49,7 @@ def initialize_jira_client() -> JIRA:
 
 def build_jql_with_dates(base_jql: str, start_date: str, end_date: str, 
                         config: Optional[Dict[str, Any]] = None,
-                        status_filter_type: str = 'executed_only') -> str:
+                        status_filter_type: str = 'completed') -> str:
     """
     Build JQL query with date range filter and optional status filters.
     
@@ -59,23 +59,23 @@ def build_jql_with_dates(base_jql: str, start_date: str, end_date: str,
         end_date: End date in YYYY-MM-DD format
         config: Optional configuration dict with status_filters and report_settings
         status_filter_type: Which status filter to use from config['status_filters']
-                           (e.g., 'executed_only', 'completed_only', 'planned_only')
+                           (e.g., 'execution', 'completed', 'planned')
         
     Returns:
         str: Complete JQL query with date filters and ordering
         
     Status Filter Logic:
         Uses config['status_filters'][status_filter_type] to include only tickets
-        matching the specified filter criteria. Defaults to 'executed_only' for
-        active/completed work states.
+        matching the specified filter criteria. Defaults to 'completed' for
+        finished work states.
         
     Example:
         jql = build_jql_with_dates(
             "project = MYPROJ AND assignee = currentUser()",
             "2025-01-01", 
             "2025-01-07",
-            {"status_filters": {"executed_only": ["In Progress", "Review", "Closed"]}},
-            "executed_only"
+            {"status_filters": {"completed": ["Closed"]}},
+            "completed"
         )
     """
     date_filter = f'updated >= "{start_date}" AND updated <= "{end_date}"'
@@ -129,7 +129,7 @@ def fetch_tickets(jira_client: JIRA, jql: str, max_results: int = 200) -> List[A
 
 def fetch_tickets_for_date_range(jira_client: JIRA, base_jql: str, start_date: str, 
                                 end_date: str, config: Optional[Dict[str, Any]] = None,
-                                status_filter_type: str = 'executed_only') -> List[Any]:
+                                status_filter_type: str = 'completed') -> List[Any]:
     """
     Convenience function to build JQL and fetch tickets for a date range.
     
@@ -140,7 +140,7 @@ def fetch_tickets_for_date_range(jira_client: JIRA, base_jql: str, start_date: s
         end_date: End date in YYYY-MM-DD format
         config: Optional configuration for filters and settings
         status_filter_type: Which status filter to use from config['status_filters']
-                           (e.g., 'executed_only', 'completed_only', 'planned_only')
+                           (e.g., 'execution', 'completed', 'planned')
         
     Returns:
         List[Any]: List of JIRA issue objects

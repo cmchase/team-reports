@@ -62,7 +62,9 @@ class QuarterlyTeamSummary:
         
         # Use utility function to fetch tickets with date range filtering
         # Combines base JQL with date constraints and status filters
-        return fetch_tickets_for_date_range(self.jira_client, self.base_jql, start_date, end_date, self.config, 'executed_only')
+        # Get default status filter from config, fallback to 'completed'
+        default_filter = self.config.get('report_settings', {}).get('default_status_filter', 'completed')
+        return fetch_tickets_for_date_range(self.jira_client, self.base_jql, start_date, end_date, self.config, default_filter)
         
     def format_ticket_info(self, issue) -> Dict[str, str]:
         """Format ticket information into a standardized dictionary for display."""

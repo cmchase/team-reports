@@ -80,22 +80,19 @@ status_filters:
     - "In Progress"
     - "Review"
     - "Closed"
-  planned_only:
+  planned:
     - "New"
     - "Refinement"
     - "To Do"
-  executed_only:
+  execution:
     - "In Progress"
     - "Review"
+  completed:
     - "Closed"
-  completed_only:
-    - "Closed"
-  exclude:
-    - "New"
-    - "Refinement"
-    - "To Do"
+ 
 
 # Optional: Report settings
 report_settings:
   max_results: 100
-  order_by: "updated DESC" 
+  order_by: "updated DESC"
+  default_status_filter: "completed"  # Which status filter to use by default 

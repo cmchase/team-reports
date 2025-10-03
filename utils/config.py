@@ -180,11 +180,15 @@ def get_default_config() -> Dict[str, Any]:
         'base_jql': '',
         'team_categories': {},
         'status_filters': {
-            'exclude': ['New', 'Refinement', 'To Do']
+            'planned': ['New', 'Refinement', 'To Do'],
+            'execution': ['In Progress', 'Review'], 
+            'completed': ['Closed'],
+            'all': ['New', 'Refinement', 'To Do', 'In Progress', 'Review', 'Closed']
         },
         'report_settings': {
             'max_results': 200,
-            'order_by': 'component ASC, updated DESC'
+            'order_by': 'component ASC, updated DESC',
+            'default_status_filter': 'completed'
         }
     }
 
