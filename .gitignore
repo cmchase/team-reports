@@ -85,6 +85,7 @@ backend_team.yaml
 frontend_team.yaml
 security_team.yaml
 devops_team.yaml
+github_config.yaml
 
 # Temporary and test configuration files
 temp_config.yaml
