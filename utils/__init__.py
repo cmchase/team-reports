@@ -22,7 +22,7 @@ Usage:
 from .jira import initialize_jira_client, fetch_tickets_for_date_range
 from .ticket import categorize_ticket, format_ticket_info
 from .date import parse_date_args, get_current_week, get_last_week
-from .config import load_config, validate_config_structure
+from .config import load_config, validate_config_structure, get_team_member_name, get_team_members_dict
 from .report import create_summary_report, save_report, generate_filename
 
 __all__ = [
@@ -42,6 +42,8 @@ __all__ = [
     # Config utilities
     'load_config',
     'validate_config_structure',
+    'get_team_member_name',
+    'get_team_members_dict',
     
     # Report utilities
     'create_summary_report',

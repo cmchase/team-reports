@@ -58,6 +58,18 @@ team_categories:
       - "audit"
     description: "Security-related work and vulnerability fixes"
 
+# Team members mapping (email to display name)
+# Maps JIRA assignee email addresses to friendly display names for reports
+# Replace with your actual team members
+team_members:
+  "manager@example.com": "Alice Manager"
+  "dev1@example.com": "Bob Developer"
+  "dev2@example.com": "Carol Engineer"  
+  "qa1@example.com": "Dave Tester"
+  "qa2@example.com": "Eve Quality"
+  "devops@example.com": "Frank Operations"
+  "security@example.com": "Grace Security"
+
 # Optional: Status filters
 # Uncomment and modify to exclude certain statuses
 status_filters:

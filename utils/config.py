@@ -235,3 +235,83 @@ def load_config_with_defaults(config_file: str) -> Dict[str, Any]:
     except SystemExit:
         print("⚠️  Using default configuration")
         return default_config
+
+
+def get_team_member_name(config: Dict[str, Any], email: str) -> str:
+    """
+    Get the display name for a team member by their email address.
+    
+    Args:
+        config: Configuration dictionary containing team_members
+        email: Email address to look up
+        
+    Returns:
+        str: Display name if found, otherwise email address
+        
+    Example:
+        name = get_team_member_name(config, "user@company.com")
+        # Returns "John Doe" or "user@company.com" if not found
+    """
+    team_members = config.get('team_members', {})
+    
+    # Handle both old list format and new dict format for backward compatibility
+    if isinstance(team_members, list):
+        # Old format: return email as-is
+        return email
+    elif isinstance(team_members, dict):
+        # New format: lookup name by email
+        return team_members.get(email, email)
+    else:
+        return email
+
+
+def get_all_team_member_emails(config: Dict[str, Any]) -> List[str]:
+    """
+    Get all team member email addresses from the configuration.
+    
+    Args:
+        config: Configuration dictionary containing team_members
+        
+    Returns:
+        List[str]: List of email addresses
+        
+    Example:
+        emails = get_all_team_member_emails(config)
+        # Returns ["user1@company.com", "user2@company.com", ...]
+    """
+    team_members = config.get('team_members', {})
+    
+    # Handle both old list format and new dict format
+    if isinstance(team_members, list):
+        return team_members
+    elif isinstance(team_members, dict):
+        return list(team_members.keys())
+    else:
+        return []
+
+
+def get_team_members_dict(config: Dict[str, Any]) -> Dict[str, str]:
+    """
+    Get team members as a dictionary mapping email to display name.
+    
+    Args:
+        config: Configuration dictionary containing team_members
+        
+    Returns:
+        Dict[str, str]: Dictionary mapping email to display name
+        
+    Example:
+        members = get_team_members_dict(config)
+        # Returns {"user@company.com": "User Name", ...}
+    """
+    team_members = config.get('team_members', {})
+    
+    # Handle both old list format and new dict format
+    if isinstance(team_members, list):
+        # Old format: create dictionary with email as both key and value
+        return {email: email for email in team_members}
+    elif isinstance(team_members, dict):
+        # New format: return as-is
+        return team_members
+    else:
+        return {}

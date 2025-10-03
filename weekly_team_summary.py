@@ -66,7 +66,7 @@ class WeeklyTeamSummary:
         
     def format_ticket_info(self, issue) -> Dict[str, str]:
         """Format ticket information for display"""
-        return format_ticket_info(issue, self.jira_client.server_url)
+        return format_ticket_info(issue, self.jira_client.server_url, self.config)
     
     # Removed - now using report_utils.format_table_row
         
