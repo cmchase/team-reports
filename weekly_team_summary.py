@@ -19,8 +19,6 @@ Examples:
 
 import sys
 import os
-import yaml
-from datetime import datetime, timedelta
 from typing import List, Dict, Any
 from collections import defaultdict
 
@@ -29,6 +27,11 @@ sys.path.insert(0, '.')
 
 from dotenv import load_dotenv
 from jira import JIRA
+from ticket_utils import categorize_ticket, format_ticket_info
+from jira_utils import initialize_jira_client, fetch_tickets_for_date_range
+from date_utils import parse_date_args as parse_date_args_util
+from config_utils import load_config
+from report_utils import create_summary_report, save_report, generate_filename
 
 # Load environment variables
 load_dotenv()
@@ -42,208 +45,41 @@ class WeeklyTeamSummary:
         
     def _load_config(self, config_file: str) -> Dict[str, Any]:
         """Load configuration from YAML file"""
-        try:
-            with open(config_file, 'r') as f:
-                config = yaml.safe_load(f)
-            print(f"✅ Loaded configuration from {config_file}")
-            return config
-        except FileNotFoundError:
-            print(f"❌ Configuration file {config_file} not found!")
-            print("Please create a team_config.yaml file or specify a valid config file.")
-            sys.exit(1)
-        except yaml.YAMLError as e:
-            print(f"❌ Error parsing YAML configuration: {e}")
-            sys.exit(1)
+        return load_config(config_file)
             
 
         
     def initialize(self):
         """Initialize the Jira client connection"""
-        try:
-            server = os.getenv("JIRA_SERVER")
-            email = os.getenv("JIRA_EMAIL")
-            api_token = os.getenv("JIRA_API_TOKEN")
-            
-            if not server or not email or not api_token:
-                raise ValueError("Missing required environment variables: JIRA_SERVER, JIRA_EMAIL, JIRA_API_TOKEN")
-            
-            from jira.client import TokenAuth
-            self.jira_client = JIRA(
-                server=server,
-                token_auth=api_token
-            )
-            print("✅ Connected to Jira")
-            
-        except Exception as e:
-            print(f"❌ Failed to connect to Jira: {e}")
-            raise
+        self.jira_client = initialize_jira_client()
         
-    def build_jql_with_dates(self, start_date: str, end_date: str) -> str:
-        """Build JQL query with date range filter"""
-        date_filter = f'updated >= "{start_date}" AND updated <= "{end_date}"'
-        
-        # Add status filter if configured
-        filters = [f'({self.base_jql})', f'({date_filter})']
-        
-        if 'status_filters' in self.config and 'exclude' in self.config['status_filters']:
-            excluded_statuses = self.config['status_filters']['exclude']
-            if excluded_statuses:
-                status_list = ', '.join([f'"{status}"' for status in excluded_statuses])
-                status_filter = f'status NOT IN ({status_list})'
-                filters.append(f'({status_filter})')
-        
-        # Get order by from config
-        order_by = self.config.get('report_settings', {}).get('order_by', 'component ASC, updated DESC')
-        
-        return ' AND '.join(filters) + f' ORDER BY {order_by}'
+    # Removed - now using jira_utils.build_jql_with_dates
         
     def fetch_tickets(self, start_date: str, end_date: str) -> List[Any]:
         """Fetch tickets for the specified date range"""
-        jql = self.build_jql_with_dates(start_date, end_date)
         print(f"🔍 Searching tickets from {start_date} to {end_date}...")
-        print(f"📝 JQL: {jql}")
-        
-        try:
-            # Get max results from config
-            max_results = self.config.get('report_settings', {}).get('max_results', 200)
-            issues = self.jira_client.search_issues(jql, maxResults=max_results)
-            print(f"📊 Found {len(issues)} tickets")
-            return issues
-        except Exception as e:
-            print(f"❌ Error fetching tickets: {e}")
-            return []
+        return fetch_tickets_for_date_range(self.jira_client, self.base_jql, start_date, end_date, self.config)
             
     def categorize_ticket(self, issue) -> str:
         """Categorize a ticket into one of the team categories"""
-        # Get ticket details
-        components = [comp.name for comp in getattr(issue.fields, 'components', [])]
-        project = issue.fields.project.key
-        summary = issue.fields.summary.lower()
-        description = (issue.fields.description or "").lower()
-        
-        # Check each category
-        for category_name, rules in self.team_categories.items():
-            # Check keywords in summary/description
-            if 'keywords' in rules:
-                text_to_search = f"{summary} {description}"
-                if any(keyword in text_to_search for keyword in rules['keywords']):
-                    return category_name
-
-            # Check components
-            if 'components' in rules:
-                if any(comp in components for comp in rules['components']):
-                    return category_name
-                    
-            # Check projects
-            if 'projects' in rules:
-                if project in rules['projects']:
-                    return category_name
-                 
-                
-        # Default category for uncategorized tickets
-        return 'Other'
+        return categorize_ticket(issue, self.team_categories)
         
     def format_ticket_info(self, issue) -> Dict[str, str]:
         """Format ticket information for display"""
-        return {
-            'key': issue.key,
-            'summary': issue.fields.summary,
-            'status': issue.fields.status.name,
-            'assignee': issue.fields.assignee.displayName if issue.fields.assignee else 'Unassigned',
-            'priority': issue.fields.priority.name if issue.fields.priority else 'None',
-            'components': [comp.name for comp in getattr(issue.fields, 'components', [])],
-            'updated': str(issue.fields.updated)[:10],  # Just the date part
-            'url': f"{self.jira_client.server_url}/browse/{issue.key}"
-        }
+        return format_ticket_info(issue, self.jira_client.server_url)
     
-    def format_table_row(self, ticket_info: Dict[str, str], title_width=50, assignee_width=20) -> str:
-        """Format a single ticket as a table row"""
-        # Create markdown link for ticket ID
-        ticket_link = f"[{ticket_info['key']}]({ticket_info['url']})"
-        
-        # Truncate title if too long
-        title = ticket_info['summary']
-        if len(title) > title_width:
-            title = title[:title_width-3] + "..."
-        
-        # Truncate assignee if too long  
-        assignee = ticket_info['assignee']
-        if len(assignee) > assignee_width:
-            assignee = assignee[:assignee_width-3] + "..."
-        
-        return f"| {ticket_link:<25} | {assignee:<{assignee_width}} | {ticket_info['priority']:<8} | {ticket_info['updated']:<10} | {title:<{title_width}} |"
+    # Removed - now using report_utils.format_table_row
         
     def generate_summary_report(self, categorized_tickets: Dict[str, List], start_date: str, end_date: str) -> str:
         """Generate a formatted summary report"""
-        report = []
-        report.append(f"## 📊 WEEKLY TEAM SUMMARY: {start_date} to {end_date}")
-        report.append("")
-        report.append(f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        report.append("")
-        
-        # Summary statistics
-        total_tickets = sum(len(tickets) for tickets in categorized_tickets.values())
-        report.append(f"### 📈 OVERVIEW")
-        report.append(f"- **Total Tickets:** {total_tickets}")
-        for category, tickets in categorized_tickets.items():
-            if tickets:  # Only show categories with tickets
-                report.append(f"- **{category}:** {len(tickets)} tickets")
-        report.append("")
-        
-        # Detailed sections
-        for category_name, category_rules in self.team_categories.items():
-            tickets = categorized_tickets.get(category_name, [])
-            
-            report.append(f"### 🎯 {category_name.upper()} - {category_rules['description']}")
-            report.append("")
-            
-            if not tickets:
-                report.append("*No tickets found for this category this week.*")
-                report.append("")
-                continue
-                
-            # Group by status
-            status_groups = defaultdict(list)
-            for ticket in tickets:
-                ticket_info = self.format_ticket_info(ticket)
-                status_groups[ticket_info['status']].append(ticket_info)
-                
-            for status, status_tickets in status_groups.items():
-                report.append(f"#### 📌 {status} ({len(status_tickets)} tickets)")
-                report.append("")
-                
-                # Add table header
-                report.append("| Ticket ID                | Assignee             | Priority | Updated    | Title                                              |")
-                report.append("|--------------------------|----------------------|----------|------------|----------------------------------------------------| ")
-                
-                # Add ticket rows
-                for ticket in status_tickets:
-                    report.append(self.format_table_row(ticket))
-                report.append("")
-                    
-        # Handle uncategorized tickets
-        other_tickets = categorized_tickets.get('Other', [])
-        if other_tickets:
-            report.append("### 🔍 OTHER / UNCATEGORIZED TICKETS")
-            report.append("")
-            
-            # Add table header
-            report.append("| Ticket ID                | Assignee             | Priority | Updated    | Title                                              |")
-            report.append("|--------------------------|----------------------|----------|------------|----------------------------------------------------| ")
-            
-            # Add ticket rows
-            for ticket in other_tickets:
-                ticket_info = self.format_ticket_info(ticket)
-                report.append(self.format_table_row(ticket_info))
-            report.append("")
-                
-        report.append("---")
-        report.append("")
-        report.append("### ✅ Report Complete")
-        report.append("")
-        report.append("*This report was generated automatically from Jira data.*")
-        
-        return "\n".join(report)
+        return create_summary_report(
+            "WEEKLY TEAM SUMMARY",
+            start_date,
+            end_date,
+            categorized_tickets,
+            self.team_categories,
+            self.format_ticket_info
+        )
         
     def generate_weekly_summary(self, start_date: str, end_date: str) -> str:
         """Generate the complete weekly summary"""
@@ -266,25 +102,8 @@ class WeeklyTeamSummary:
         
 def parse_date_args():
     """Parse command line date arguments or use current week"""
-    if len(sys.argv) >= 3:
-        start_date = sys.argv[1]
-        end_date = sys.argv[2]
-    elif len(sys.argv) == 2:
-        # Single date provided, assume it's the start of the week
-        start_date = sys.argv[1]
-        start_dt = datetime.strptime(start_date, '%Y-%m-%d')
-        end_dt = start_dt + timedelta(days=6)
-        end_date = end_dt.strftime('%Y-%m-%d')
-    else:
-        # No dates provided, use current week (Monday to Sunday)
-        today = datetime.now()
-        days_since_monday = today.weekday()
-        monday = today - timedelta(days=days_since_monday)
-        sunday = monday + timedelta(days=6)
-        start_date = monday.strftime('%Y-%m-%d')
-        end_date = sunday.strftime('%Y-%m-%d')
-        
-    return start_date, end_date
+    # Use the utility function
+    return parse_date_args_util(sys.argv[1:])
 
 def main():
     """Main function"""
@@ -303,17 +122,10 @@ def main():
         summary_generator = WeeklyTeamSummary(config_file)
         report = summary_generator.generate_weekly_summary(start_date, end_date)
         
-        # Create Reports directory if it doesn't exist
-        reports_dir = "Reports"
-        os.makedirs(reports_dir, exist_ok=True)
+        # Save report using utility functions
+        filename = generate_filename('team_summary', start_date, end_date)
+        filepath = save_report(report, filename)
         
-        # Save report to file in Reports directory (as Markdown for better formatting)
-        filename = f"team_summary_{start_date}_to_{end_date}.md"
-        filepath = os.path.join(reports_dir, filename)
-        with open(filepath, 'w') as f:
-            f.write(report)
-            
-        print(f"📄 Report saved to: {filepath}")
         print("\n" + report)
         
     except Exception as e:
