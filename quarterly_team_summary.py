@@ -177,8 +177,8 @@ class QuarterlyTeamSummary:
         # Start building contributor section
         section = [
             f"### 👤 {contributor}", 
-            f"**Total Tickets:** {len(tickets)}", 
-            f"**Total Story Points:** {total_story_points}",
+            f"- **Total Tickets:** {len(tickets)}", 
+            f"- **Total Story Points:**  {total_story_points}",
             ""
         ]
         
@@ -188,7 +188,7 @@ class QuarterlyTeamSummary:
         
         # Group tickets by status and story points
         for ticket in tickets:
-            status_breakdown[ticket['status']] += 1
+            # status_breakdown[ticket['status']] += 1
             story_point_breakdown[ticket['story_points']] += 1
         
         # Show status distribution
@@ -205,7 +205,7 @@ class QuarterlyTeamSummary:
             for story_points, count in sorted(story_point_breakdown.items(), 
                                             key=lambda x: x[0] if x[0] != 0 else float('inf')):
                 percentage = (count / len(tickets) * 100) if len(tickets) > 0 else 0
-                sp_label = f"{story_points} SP" if story_points > 0 else "No SP"
+                sp_label = f"{story_points} Points" if story_points > 0 else "No Points"
                 section.append(f"- **{sp_label}:** {count} tickets ({percentage:.1f}%)")
             section.append("")
         
@@ -245,7 +245,7 @@ class QuarterlyTeamSummary:
             for story_points, count in sorted(performance['story_point_distribution'].items(), 
                                             key=lambda x: x[0] if x[0] != 0 else float('inf')):
                 percentage = (count / total_tickets * 100) if total_tickets > 0 else 0
-                sp_label = f"{story_points} SP" if story_points > 0 else "No SP"
+                sp_label = f"{story_points} Points" if story_points > 0 else "No Points"
                 insights.append(f"- **{sp_label}:** {count} tickets ({percentage:.1f}%)")
             insights.append("")
         
