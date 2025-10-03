@@ -19,6 +19,7 @@ from collections import defaultdict, Counter
 from datetime import datetime, timezone
 import requests
 import json
+import time
 
 # Add current directory to path for imports
 sys.path.insert(0, '.')
@@ -84,7 +85,7 @@ class GitHubQuarterlySummary:
         return all_data
 
     def fetch_pull_requests(self, repo: str, start_date: str, end_date: str) -> List[Dict]:
-        """Fetch pull requests for a repository in the date range."""
+        """Fetch pull requests for a repository in the date range with detailed information."""
         print(f"🔍 Fetching pull requests for {repo} from {start_date} to {end_date}...")
         
         endpoint = f"repos/{repo}/pulls"
@@ -107,7 +108,40 @@ class GitHubQuarterlySummary:
             if start_dt <= updated_at <= end_dt:
                 filtered_prs.append(pr)
         
-        return filtered_prs
+        # Fetch detailed information for each PR to get additions/deletions
+        detailed_prs = []
+        for pr in filtered_prs:
+            try:
+                print(f"  📊 Fetching details for PR #{pr['number']}...")
+                detailed_pr = self._fetch_pr_details(repo, pr['number'])
+                # Merge basic PR info with detailed info
+                pr.update(detailed_pr)
+                detailed_prs.append(pr)
+            except Exception as e:
+                print(f"  ⚠️  Warning: Could not fetch details for PR #{pr['number']}: {e}")
+                # Keep the PR but with 0 additions/deletions
+                pr['additions'] = 0
+                pr['deletions'] = 0
+                detailed_prs.append(pr)
+        
+        return detailed_prs
+
+    def _fetch_pr_details(self, repo: str, pr_number: int) -> Dict:
+        """Fetch detailed information for a specific pull request."""
+        url = f"{self.base_url}/repos/{repo}/pulls/{pr_number}"
+        
+        # Add small delay to avoid hitting rate limits too hard
+        time.sleep(0.1)
+        
+        response = requests.get(url, headers=self.headers)
+        response.raise_for_status()
+        
+        pr_data = response.json()
+        return {
+            'additions': pr_data.get('additions', 0),
+            'deletions': pr_data.get('deletions', 0),
+            'changed_files': pr_data.get('changed_files', 0)
+        }
 
     def fetch_commits(self, repo: str, start_date: str, end_date: str) -> List[Dict]:
         """Fetch commits for a repository in the date range."""
@@ -177,7 +211,8 @@ class GitHubQuarterlySummary:
                     'merged_at': pr.get('merged_at'),
                     'url': pr['html_url'],
                     'additions': pr.get('additions', 0),
-                    'deletions': pr.get('deletions', 0)
+                    'deletions': pr.get('deletions', 0),
+                    'changed_files': pr.get('changed_files', 0)
                 })
                 performance['contributor_pr_counts'][author] += 1
                 performance['contributor_lines_added'][author] += pr.get('additions', 0)
@@ -297,14 +332,17 @@ class GitHubQuarterlySummary:
             section.append("#### 🔄 Recent Pull Requests")
             recent_prs = sorted(prs, key=lambda x: x['updated_at'], reverse=True)[:10]
             section.extend([
-                "| Repository | PR | State | Title |",
-                "|------------|-------|-------|-------|"
+                "| Repository | PR | State | Lines | Title |",
+                "|------------|-------|-------|--------|-------|"
             ])
             
             for pr in recent_prs:
-                title = pr['title'][:50] + "..." if len(pr['title']) > 50 else pr['title']
+                title = pr['title'][:40] + "..." if len(pr['title']) > 40 else pr['title']
                 state_emoji = "✅" if pr['state'] == 'closed' and pr['merged_at'] else "❌" if pr['state'] == 'closed' else "🔄"
-                section.append(f"| {pr['repo']} | [#{pr['number']}]({pr['url']}) | {state_emoji} {pr['state']} | {title} |")
+                additions = pr.get('additions', 0)
+                deletions = pr.get('deletions', 0)
+                lines_change = f"+{additions}/-{deletions}" if additions > 0 or deletions > 0 else "No data"
+                section.append(f"| {pr['repo']} | [#{pr['number']}]({pr['url']}) | {state_emoji} {pr['state']} | {lines_change} | {title} |")
             section.append("")
         
         # Show repository contributions
