@@ -2,8 +2,8 @@
 """
 Quarterly Team Summary Generator for Jira Tickets
 
-Generates quarterly summaries by aggregating data across the quarter period,
-providing trending analysis and comprehensive insights into team work patterns.
+Generates quarterly summaries focused on individual contributor performance,
+tracking ticket completion counts and productivity metrics per team member.
 
 Usage:
     python3 quarterly_team_summary.py [year] [quarter] [config_file]
@@ -23,7 +23,7 @@ sys.path.insert(0, '.')
 
 from dotenv import load_dotenv
 from jira import JIRA
-from utils.ticket import categorize_ticket, format_ticket_info
+from utils.ticket import format_ticket_info
 from utils.jira import initialize_jira_client, fetch_tickets_for_date_range
 from utils.date import get_current_quarter, get_quarter_range, parse_quarter_from_date
 from utils.config import load_config
@@ -44,7 +44,6 @@ class QuarterlyTeamSummary:
         
         # Extract commonly used config values for easy access
         self.base_jql = self.config['base_jql']  # Base JQL query for ticket filtering
-        self.team_categories = self.config['team_categories']  # Team categorization rules
         
     def _load_config(self, config_file: str) -> Dict[str, Any]:
         """Load configuration from YAML file using utility function."""
@@ -65,331 +64,261 @@ class QuarterlyTeamSummary:
         # Combines base JQL with date constraints and status filters
         return fetch_tickets_for_date_range(self.jira_client, self.base_jql, start_date, end_date, self.config)
         
-    def categorize_ticket(self, issue) -> str:
-        """Categorize a ticket into one of the configured team categories."""
-        # Use utility function to match ticket against team category rules
-        # Returns category name or 'Other' if no match found
-        return categorize_ticket(issue, self.team_categories)
-        
     def format_ticket_info(self, issue) -> Dict[str, str]:
         """Format ticket information into a standardized dictionary for display."""
         # Extract and format key ticket fields (ID, title, assignee, status, etc.)
         # Returns structured data for consistent report formatting
         return format_ticket_info(issue, self.jira_client.server_url, self.config)
     
-    def analyze_quarterly_trends(self, tickets: List[Any]) -> Dict[str, Any]:
-        """Analyze trends and patterns across the quarter for insights generation."""
-        # Initialize trend tracking dictionaries with default values
-        trends = {
-            'monthly_breakdown': defaultdict(lambda: defaultdict(int)),  # Month -> Category -> Count
-            'status_trends': defaultdict(int),                           # Status -> Count
-            'assignee_activity': defaultdict(int),                       # Assignee -> Count
-            'priority_distribution': defaultdict(int),                   # Priority -> Count
-            'component_activity': defaultdict(int)                       # Component -> Count
+    def analyze_contributor_performance(self, tickets: List[Any]) -> Dict[str, Any]:
+        """Analyze individual contributor performance and productivity metrics."""
+        # Initialize performance tracking dictionaries
+        performance = {
+            'contributor_tickets': defaultdict(list),        # Assignee -> List of tickets
+            'contributor_counts': defaultdict(int),          # Assignee -> Total count
+            'status_distribution': defaultdict(int),         # Status -> Count
+            'priority_distribution': defaultdict(int),       # Priority -> Count
+            'monthly_activity': defaultdict(lambda: defaultdict(int)),  # Month -> Assignee -> Count
+            'component_activity': defaultdict(int)           # Component -> Count
         }
         
-        # Process each ticket to extract trending data
+        # Process each ticket to extract contributor performance data
         for ticket in tickets:
             # Get formatted ticket information for analysis
             ticket_info = self.format_ticket_info(ticket)
+            assignee = ticket_info['assignee']
             
-            # Extract trends data with error handling for invalid dates/fields
+            # Track tickets per contributor
+            performance['contributor_tickets'][assignee].append(ticket_info)
+            performance['contributor_counts'][assignee] += 1
+            
+            # Track overall distributions
+            performance['status_distribution'][ticket_info['status']] += 1
+            performance['priority_distribution'][ticket_info['priority']] += 1
+            
+            # Extract monthly activity with error handling
             try:
                 # Parse the updated date to extract month information
                 updated_date = datetime.strptime(ticket_info['updated'], '%Y-%m-%d')
                 month = updated_date.strftime('%B')  # Full month name (e.g., "October")
-                
-                # Categorize ticket to track category trends by month
-                category = self.categorize_ticket(ticket)
-                
-                # Accumulate trend data across multiple dimensions
-                trends['monthly_breakdown'][month][category] += 1      # Monthly category activity
-                trends['status_trends'][ticket_info['status']] += 1    # Overall status distribution
-                trends['assignee_activity'][ticket_info['assignee']] += 1  # Team member activity
-                trends['priority_distribution'][ticket_info['priority']] += 1  # Priority patterns
-                
-                # Extract component information if available
-                if hasattr(ticket.fields, 'components') and ticket.fields.components:
-                    for component in ticket.fields.components:
-                        trends['component_activity'][component.name] += 1
+                performance['monthly_activity'][month][assignee] += 1
                         
             except (ValueError, AttributeError):
                 # Skip tickets with invalid dates or missing required fields
-                # This prevents crashes from malformed data
                 continue
+            
+            # Extract component information if available
+            if hasattr(ticket.fields, 'components') and ticket.fields.components:
+                for component in ticket.fields.components:
+                    performance['component_activity'][component.name] += 1
                 
-        return trends
+        return performance
     
-    def generate_quarterly_overview(self, categorized_tickets: Dict[str, List], 
-                                  trends: Dict[str, Any], year: int, quarter: int) -> List[str]:
-        """Generate the quarterly overview section with high-level statistics and trends."""
-        # Calculate total ticket count across all categories
-        total_tickets = sum(len(tickets) for tickets in categorized_tickets.values())
+    def generate_quarterly_overview(self, performance: Dict[str, Any], year: int, quarter: int) -> List[str]:
+        """Generate the quarterly overview section focused on contributor performance."""
+        # Calculate total ticket count and contributor count
+        total_tickets = sum(performance['contributor_counts'].values())
+        total_contributors = len(performance['contributor_counts'])
         
         # Start building the overview section with header and basic stats
         overview = [
-            f"### 📊 Q{quarter} {year} OVERVIEW",
+            f"### 📊 Q{quarter} {year} CONTRIBUTOR OVERVIEW",
             f"- **Total Tickets Processed:** {total_tickets}",
+            f"- **Active Contributors:** {total_contributors}",
             f"- **Quarter Period:** Q{quarter} {year}",
             ""
         ]
         
-        # Add work distribution breakdown by category with percentages
-        overview.append("#### 🎯 Work Distribution by Category")
-        for category, tickets in categorized_tickets.items():
-            if tickets:  # Only show categories that have tickets
-                # Calculate percentage of total work for this category
-                percentage = (len(tickets) / total_tickets * 100) if total_tickets > 0 else 0
-                overview.append(f"- **{category}:** {len(tickets)} tickets ({percentage:.1f}%)")
-        overview.append("")
-        
-        # Add monthly activity trend if data is available
-        if trends['monthly_breakdown']:
-            overview.append("#### 📈 Monthly Activity Trend")
-            # Show total activity per month within the quarter
-            for month, categories in trends['monthly_breakdown'].items():
-                month_total = sum(categories.values())  # Sum across all categories for the month
-                overview.append(f"- **{month}:** {month_total} tickets")
+        # Add top contributors by ticket count
+        if performance['contributor_counts']:
+            overview.append("#### 🏆 Top Contributors by Ticket Count")
+            # Sort contributors by ticket count and show all (or top 15 if too many)
+            top_contributors = sorted(performance['contributor_counts'].items(), 
+                                    key=lambda x: x[1], reverse=True)
+            
+            # Show all contributors if reasonable number, otherwise limit to top 15
+            display_count = min(15, len(top_contributors))
+            for i, (contributor, count) in enumerate(top_contributors[:display_count], 1):
+                percentage = (count / total_tickets * 100) if total_tickets > 0 else 0
+                overview.append(f"{i}. **{contributor}:** {count} tickets ({percentage:.1f}%)")
+            
+            if len(top_contributors) > display_count:
+                overview.append(f"*... and {len(top_contributors) - display_count} more contributors*")
             overview.append("")
         
-        # Add top team members by activity level
-        if trends['assignee_activity']:
-            overview.append("#### 👥 Most Active Team Members")
-            # Sort assignees by ticket count and show top 10
-            top_assignees = sorted(trends['assignee_activity'].items(), 
-                                 key=lambda x: x[1], reverse=True)[:10]
-            for assignee, count in top_assignees:
-                overview.append(f"- **{assignee}:** {count} tickets")
+        # Add monthly activity trend if data is available
+        if performance['monthly_activity']:
+            overview.append("#### 📈 Monthly Activity Summary")
+            # Show total activity per month within the quarter
+            for month, contributors in performance['monthly_activity'].items():
+                month_total = sum(contributors.values())  # Sum across all contributors for the month
+                active_contributors = len(contributors)
+                overview.append(f"- **{month}:** {month_total} tickets ({active_contributors} contributors)")
             overview.append("")
         
         return overview
     
-    def generate_category_trends(self, category_name: str, tickets: List[Any], 
-                               trends: Dict[str, Any]) -> List[str]:
-        """Generate detailed trend analysis for a specific team category."""
-        # Return empty list if no tickets in this category
+    def generate_contributor_details(self, contributor: str, tickets: List[Dict[str, str]], performance: Dict[str, Any]) -> List[str]:
+        """Generate detailed analysis for a specific contributor."""
         if not tickets:
             return []
             
-        # Start building category-specific insights section
-        section = [f"#### 📊 {category_name} Quarterly Insights", ""]
+        # Start building contributor section
+        section = [f"### 👤 {contributor}", f"**Total Tickets:** {len(tickets)}", ""]
         
-        # Initialize counters for category-specific analysis
-        category_statuses = defaultdict(int)    # Status distribution within this category
-        category_assignees = defaultdict(int)   # Assignee distribution within this category
+        # Analyze tickets for this contributor
+        status_breakdown = defaultdict(int)
+        priority_breakdown = defaultdict(int)
         
-        # Analyze tickets within this category only
+        # Group tickets by status and priority
         for ticket in tickets:
-            ticket_info = self.format_ticket_info(ticket)
-            category_statuses[ticket_info['status']] += 1      # Count tickets by status
-            category_assignees[ticket_info['assignee']] += 1   # Count tickets by assignee
+            status_breakdown[ticket['status']] += 1
+            priority_breakdown[ticket['priority']] += 1
         
-        # Generate status distribution analysis
-        section.append("**Status Distribution:**")
-        # Sort statuses by count (most common first) for better readability
-        for status, count in sorted(category_statuses.items(), key=lambda x: x[1], reverse=True):
-            # Calculate percentage within this category
-            percentage = (count / len(tickets) * 100) if len(tickets) > 0 else 0
-            section.append(f"- {status}: {count} tickets ({percentage:.1f}%)")
-        section.append("")
-        
-        # Generate top contributors analysis (only if multiple assignees)
-        if len(category_assignees) > 1:
-            section.append("**Top Contributors:**")
-            # Show top 3 contributors to avoid cluttering the report
-            top_contributors = sorted(category_assignees.items(), key=lambda x: x[1], reverse=True)[:3]
-            for assignee, count in top_contributors:
-                section.append(f"- {assignee}: {count} tickets")
+        # Show status distribution
+        if status_breakdown:
+            section.append("#### 📊 Status Breakdown")
+            for status, count in sorted(status_breakdown.items(), key=lambda x: x[1], reverse=True):
+                percentage = (count / len(tickets) * 100) if len(tickets) > 0 else 0
+                section.append(f"- **{status}:** {count} tickets ({percentage:.1f}%)")
             section.append("")
+        
+        # Show priority distribution
+        if priority_breakdown:
+            section.append("#### ⚠️ Priority Breakdown")
+            for priority, count in sorted(priority_breakdown.items(), key=lambda x: x[1], reverse=True):
+                percentage = (count / len(tickets) * 100) if len(tickets) > 0 else 0
+                section.append(f"- **{priority}:** {count} tickets ({percentage:.1f}%)")
+            section.append("")
+        
+        # Show recent tickets (limit to 15 for readability)
+        section.append("#### 🎫 Recent Tickets")
+        recent_tickets = sorted(tickets, key=lambda x: x['updated'], reverse=True)[:15]
+        
+        section.extend([
+            "| Ticket ID | Status | Priority | Updated | Title |",
+            "|-----------|--------|----------|---------|-------|"
+        ])
+        
+        for ticket in recent_tickets:
+            # Truncate long titles for table formatting
+            title = ticket['summary'][:60] + "..." if len(ticket['summary']) > 60 else ticket['summary']
+            section.append(f"| [{ticket['key']}]({ticket['url']}) | {ticket['status']} | {ticket['priority']} | {ticket['updated']} | {title} |")
+        
+        if len(tickets) > 15:
+            section.append(f"*... and {len(tickets) - 15} more tickets*")
+        section.append("")
         
         return section
     
-    def generate_quarterly_insights(self, trends: Dict[str, Any]) -> List[str]:
-        """Generate comprehensive insights and actionable recommendations from trend data."""
+    def generate_quarterly_insights(self, performance: Dict[str, Any]) -> List[str]:
+        """Generate insights focused on contributor performance patterns."""
         # Start building the insights section with header
         insights = [
-            "### 🔍 QUARTERLY INSIGHTS & ANALYSIS",
+            "### 🔍 QUARTERLY PERFORMANCE INSIGHTS",
             ""
         ]
         
-        # Analyze and display priority distribution patterns
-        if trends['priority_distribution']:
-            insights.append("#### ⚠️ Priority Distribution")
+        # Analyze overall priority distribution
+        if performance['priority_distribution']:
+            insights.append("#### ⚠️ Overall Priority Distribution")
+            total_tickets = sum(performance['priority_distribution'].values())
             
-            # Calculate total tickets with defined priorities (exclude 'Undefined')
-            total_prioritized = sum(count for priority, count in trends['priority_distribution'].items() 
-                                   if priority != 'Undefined')
-            
-            # Show priority breakdown for defined priorities
-            for priority, count in sorted(trends['priority_distribution'].items(), 
+            for priority, count in sorted(performance['priority_distribution'].items(), 
                                         key=lambda x: x[1], reverse=True):
-                if priority != 'Undefined':
-                    # Calculate percentage among prioritized tickets
-                    percentage = (count / total_prioritized * 100) if total_prioritized > 0 else 0
-                    insights.append(f"- **{priority}:** {count} tickets ({percentage:.1f}%)")
-                    
-            # Separately handle undefined priorities as they indicate process gaps
-            undefined_count = trends['priority_distribution'].get('Undefined', 0)
-            if undefined_count > 0:
-                total_tickets = sum(trends['priority_distribution'].values())
-                undefined_pct = (undefined_count / total_tickets * 100) if total_tickets > 0 else 0
-                insights.append(f"- **Undefined Priority:** {undefined_count} tickets ({undefined_pct:.1f}%)")
+                percentage = (count / total_tickets * 100) if total_tickets > 0 else 0
+                insights.append(f"- **{priority}:** {count} tickets ({percentage:.1f}%)")
             insights.append("")
         
         # Analyze component activity to identify focus areas
-        if trends['component_activity']:
+        if performance['component_activity']:
             insights.append("#### 🛠️ Most Active Components")
-            # Show top 5 components to highlight main areas of work
-            top_components = sorted(trends['component_activity'].items(), 
-                                  key=lambda x: x[1], reverse=True)[:5]
+            # Show top 10 components to highlight main areas of work
+            top_components = sorted(performance['component_activity'].items(), 
+                                  key=lambda x: x[1], reverse=True)[:10]
             for component, count in top_components:
                 insights.append(f"- **{component}:** {count} tickets")
             insights.append("")
         
-        # Generate data-driven recommendations section
+        # Generate team productivity insights
         insights.extend([
-            "#### 💡 Recommendations",
+            "#### 💡 Team Productivity Insights",
             "",
-            "Based on this quarter's data:",
+            "Based on this quarter's contributor data:",
             ""
         ])
         
-        # Recommendation 1: Priority management assessment
-        undefined_count = trends['priority_distribution'].get('Undefined', 0)
-        total_tickets = sum(trends['priority_distribution'].values())
-        # Flag if more than 30% of tickets lack priority - indicates planning gaps
-        if undefined_count > total_tickets * 0.3:
-            insights.append("- 🎯 **Priority Management:** Consider reviewing and setting priorities for undefined tickets to improve planning")
+        # Calculate productivity metrics
+        contributor_counts = list(performance['contributor_counts'].values())
+        total_contributors = len(contributor_counts)
+        total_tickets = sum(contributor_counts)
         
-        # Recommendation 2: Workload distribution analysis
-        assignee_counts = list(trends['assignee_activity'].values())
-        # Flag if one person handles >40% of work - indicates potential bottleneck
-        if assignee_counts and max(assignee_counts) > sum(assignee_counts) * 0.4:
-            insights.append("- ⚖️ **Workload Balance:** Consider redistributing work to balance team member assignments")
+        if contributor_counts:
+            avg_tickets_per_contributor = total_tickets / total_contributors
+            max_tickets = max(contributor_counts)
+            min_tickets = min(contributor_counts)
+            
+            insights.append(f"- 📊 **Average tickets per contributor:** {avg_tickets_per_contributor:.1f}")
+            insights.append(f"- 📈 **Highest contributor ticket count:** {max_tickets}")
+            insights.append(f"- 📉 **Lowest contributor ticket count:** {min_tickets}")
+            
+            # Identify workload distribution pattern
+            high_performers = sum(1 for count in contributor_counts if count > avg_tickets_per_contributor * 1.5)
+            if high_performers > 0:
+                insights.append(f"- 🏆 **High performers (>150% avg):** {high_performers} contributors")
+            
+            # Flag potential workload imbalances
+            if max_tickets > avg_tickets_per_contributor * 3:
+                insights.append("- ⚠️ **Workload Balance:** Consider reviewing ticket distribution - significant variance detected")
         
         insights.append("")
         return insights
     
-    def generate_quarterly_report(self, categorized_tickets: Dict[str, List], 
-                                year: int, quarter: int, start_date: str, end_date: str) -> str:
-        """Generate the complete quarterly summary report with all sections."""
-        # Collect all tickets from all categories for trend analysis
-        all_tickets = []
-        for category_tickets in categorized_tickets.values():
-            all_tickets.extend(category_tickets)
-        
-        # Perform comprehensive trend analysis across all tickets
-        trends = self.analyze_quarterly_trends(all_tickets)
-        
+    def generate_quarterly_report(self, performance: Dict[str, Any], year: int, quarter: int, start_date: str, end_date: str) -> str:
+        """Generate the complete quarterly summary report focused on individual contributors."""
         # Initialize report as list of strings (will be joined at the end)
         report = []
         
         # Generate report header with metadata
         report.extend([
-            f"## 📊 QUARTERLY TEAM SUMMARY: Q{quarter} {year}",
+            f"## 📊 QUARTERLY CONTRIBUTOR REPORT: Q{quarter} {year}",
             "",
             f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
             f"**Quarter Period:** {start_date} to {end_date}",
             ""
         ])
         
-        # Add high-level overview section with trends
-        report.extend(self.generate_quarterly_overview(categorized_tickets, trends, year, quarter))
+        # Add high-level overview section
+        report.extend(self.generate_quarterly_overview(performance, year, quarter))
         
-        # Generate detailed sections for each configured team category
-        for category_name, category_rules in self.team_categories.items():
-            tickets = categorized_tickets.get(category_name, [])
-            
-            # Process categories that have tickets
-            if tickets:
-                description = category_rules.get('description', 'No description')
-                report.extend([
-                    f"### 🎯 {category_name.upper()} - {description}",
-                    f"**Total Tickets:** {len(tickets)}",
-                    ""
-                ])
-                
-                # Add category-specific trend insights
-                report.extend(self.generate_category_trends(category_name, tickets, trends))
-                
-                # Group tickets by status for detailed breakdown
-                status_groups = defaultdict(list)
-                for ticket in tickets:
-                    ticket_info = self.format_ticket_info(ticket)
-                    status_groups[ticket_info['status']].append(ticket_info)
-                
-                # Generate status-based ticket listings
-                for status, status_tickets in status_groups.items():
-                    if status_tickets:
-                        report.extend([
-                            f"##### 📌 {status} ({len(status_tickets)} tickets)",
-                            ""
-                        ])
-                        
-                        # Show most recent tickets (up to 10 per status to avoid overwhelming)
-                        recent_tickets = sorted(status_tickets, 
-                                              key=lambda x: x['updated'], reverse=True)[:10]
-                        
-                        # Create markdown table with ticket details
-                        report.extend([
-                            "| Ticket ID | Assignee | Priority | Updated | Title |",
-                            "|-----------|----------|----------|---------|-------|"
-                        ])
-                        
-                        # Format each ticket as a table row
-                        for ticket in recent_tickets:
-                            # Truncate long titles and assignee names for table formatting
-                            title = ticket['summary'][:50] + "..." if len(ticket['summary']) > 50 else ticket['summary']
-                            assignee = ticket['assignee'][:15] + "..." if len(ticket['assignee']) > 15 else ticket['assignee']
-                            report.append(f"| [{ticket['key']}]({ticket['url']}) | {assignee} | {ticket['priority']} | {ticket['updated']} | {title} |")
-                        
-                        # Indicate if there are more tickets not shown
-                        if len(status_tickets) > 10:
-                            report.append(f"*... and {len(status_tickets) - 10} more tickets*")
-                        report.append("")
-            else:
-                # Handle categories with no tickets
-                report.extend([
-                    f"### 🎯 {category_name.upper()}",
-                    "*No tickets found for this category this quarter.*",
-                    ""
-                ])
+        # Generate individual contributor sections
+        # Sort contributors by ticket count (highest first)
+        sorted_contributors = sorted(performance['contributor_counts'].items(), 
+                                   key=lambda x: x[1], reverse=True)
         
-        # Process uncategorized tickets (may indicate categorization gaps)
-        other_tickets = categorized_tickets.get('Other', [])
-        if other_tickets:
-            report.extend([
-                f"### 🔍 OTHER / UNCATEGORIZED TICKETS ({len(other_tickets)} tickets)",
-                "",
-                "*Showing first 10 tickets - these may need category assignment*",
-                "",
-                "| Ticket ID | Assignee | Priority | Updated | Title |",
-                "|-----------|----------|----------|---------|-------|"
-            ])
-            
-            # Show sample of uncategorized tickets for review
-            for ticket in other_tickets[:10]:
-                ticket_info = self.format_ticket_info(ticket)
-                title = ticket_info['summary'][:50] + "..." if len(ticket_info['summary']) > 50 else ticket_info['summary']
-                assignee = ticket_info['assignee'][:15] + "..." if len(ticket_info['assignee']) > 15 else ticket_info['assignee']
-                report.append(f"| [{ticket_info['key']}]({ticket_info['url']}) | {assignee} | {ticket_info['priority']} | {ticket_info['updated']} | {title} |")
-            
-            # Indicate total count if more exist
-            if len(other_tickets) > 10:
-                report.append(f"*... and {len(other_tickets) - 10} more uncategorized tickets*")
-            report.append("")
+        report.append("## 👥 INDIVIDUAL CONTRIBUTOR DETAILS")
+        report.append("")
         
-        # Add comprehensive insights and recommendations
-        report.extend(self.generate_quarterly_insights(trends))
+        for contributor, ticket_count in sorted_contributors:
+            # Get tickets for this contributor
+            contributor_tickets = performance['contributor_tickets'][contributor]
+            
+            # Generate detailed section for this contributor
+            contributor_section = self.generate_contributor_details(contributor, contributor_tickets, performance)
+            report.extend(contributor_section)
+        
+        # Add comprehensive insights and analysis
+        report.extend(self.generate_quarterly_insights(performance))
         
         # Generate report footer with completion metadata
         report.extend([
             "---",
             "",
-            f"### ✅ Q{quarter} {year} Report Complete",
+            f"### ✅ Q{quarter} {year} Contributor Report Complete",
             "",
             "*This quarterly report was generated automatically from Jira data.*",
-            f"*Report covers the period from {start_date} to {end_date}*"
+            f"*Report covers the period from {start_date} to {end_date}*",
+            f"*Focus: Individual contributor performance and ticket completion tracking*"
         ])
         
         # Join all report sections into final markdown string
@@ -410,14 +339,11 @@ class QuarterlyTeamSummary:
         if not tickets:
             return f"No tickets found for Q{quarter} {year} ({start_date} to {end_date})"
         
-        # Categorize all tickets according to team categorization rules
-        categorized_tickets = defaultdict(list)
-        for ticket in tickets:
-            category = self.categorize_ticket(ticket)  # Determine which team category this ticket belongs to
-            categorized_tickets[category].append(ticket)
+        # Analyze contributor performance across all tickets
+        performance = self.analyze_contributor_performance(tickets)
         
-        # Generate the complete formatted report using all collected data
-        return self.generate_quarterly_report(categorized_tickets, year, quarter, start_date, end_date)
+        # Generate the complete formatted report using all collected performance data
+        return self.generate_quarterly_report(performance, year, quarter, start_date, end_date)
 
 
 def parse_quarter_args() -> Tuple[int, int]:
