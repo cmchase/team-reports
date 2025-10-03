@@ -48,7 +48,8 @@ def initialize_jira_client() -> JIRA:
 
 
 def build_jql_with_dates(base_jql: str, start_date: str, end_date: str, 
-                        config: Optional[Dict[str, Any]] = None) -> str:
+                        config: Optional[Dict[str, Any]] = None,
+                        status_filter_type: str = 'executed_only') -> str:
     """
     Build JQL query with date range filter and optional status filters.
     
@@ -57,21 +58,24 @@ def build_jql_with_dates(base_jql: str, start_date: str, end_date: str,
         start_date: Start date in YYYY-MM-DD format
         end_date: End date in YYYY-MM-DD format
         config: Optional configuration dict with status_filters and report_settings
+        status_filter_type: Which status filter to use from config['status_filters']
+                           (e.g., 'executed_only', 'completed_only', 'planned_only')
         
     Returns:
         str: Complete JQL query with date filters and ordering
         
     Status Filter Logic:
-        Uses config['status_filters']['executed_only'] to include only tickets
-        in active/completed work states (e.g., "In Progress", "Review", "Closed").
-        This focuses reports on actual work progress rather than planning tickets.
+        Uses config['status_filters'][status_filter_type] to include only tickets
+        matching the specified filter criteria. Defaults to 'executed_only' for
+        active/completed work states.
         
     Example:
         jql = build_jql_with_dates(
             "project = MYPROJ AND assignee = currentUser()",
             "2025-01-01", 
             "2025-01-07",
-            {"status_filters": {"executed_only": ["In Progress", "Review", "Closed"]}}
+            {"status_filters": {"executed_only": ["In Progress", "Review", "Closed"]}},
+            "executed_only"
         )
     """
     date_filter = f'updated >= "{start_date}" AND updated <= "{end_date}"'
@@ -79,9 +83,9 @@ def build_jql_with_dates(base_jql: str, start_date: str, end_date: str,
     # Build filter components
     filters = [f'({base_jql})', f'({date_filter})']
     
-    # Add status filter if configured - use include approach for executed work
-    if config and 'status_filters' in config and 'executed_only' in config['status_filters']:
-        included_statuses = config['status_filters']['executed_only']
+    # Add status filter if configured - use configurable filter type
+    if config and 'status_filters' in config and status_filter_type in config['status_filters']:
+        included_statuses = config['status_filters'][status_filter_type]
         if included_statuses:
             status_list = ', '.join([f'"{status}"' for status in included_statuses])
             status_filter = f'status IN ({status_list})'
@@ -124,7 +128,8 @@ def fetch_tickets(jira_client: JIRA, jql: str, max_results: int = 200) -> List[A
 
 
 def fetch_tickets_for_date_range(jira_client: JIRA, base_jql: str, start_date: str, 
-                                end_date: str, config: Optional[Dict[str, Any]] = None) -> List[Any]:
+                                end_date: str, config: Optional[Dict[str, Any]] = None,
+                                status_filter_type: str = 'executed_only') -> List[Any]:
     """
     Convenience function to build JQL and fetch tickets for a date range.
     
@@ -134,6 +139,8 @@ def fetch_tickets_for_date_range(jira_client: JIRA, base_jql: str, start_date: s
         start_date: Start date in YYYY-MM-DD format
         end_date: End date in YYYY-MM-DD format
         config: Optional configuration for filters and settings
+        status_filter_type: Which status filter to use from config['status_filters']
+                           (e.g., 'executed_only', 'completed_only', 'planned_only')
         
     Returns:
         List[Any]: List of JIRA issue objects
@@ -144,7 +151,7 @@ def fetch_tickets_for_date_range(jira_client: JIRA, base_jql: str, start_date: s
         max_results = config['report_settings'].get('max_results', max_results)
     
     # Build JQL and fetch tickets
-    jql = build_jql_with_dates(base_jql, start_date, end_date, config)
+    jql = build_jql_with_dates(base_jql, start_date, end_date, config, status_filter_type)
     return fetch_tickets(jira_client, jql, max_results)
 
 

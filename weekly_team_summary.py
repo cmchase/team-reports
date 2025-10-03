@@ -58,7 +58,7 @@ class WeeklyTeamSummary:
     def fetch_tickets(self, start_date: str, end_date: str) -> List[Any]:
         """Fetch tickets for the specified date range"""
         print(f"🔍 Searching tickets from {start_date} to {end_date}...")
-        return fetch_tickets_for_date_range(self.jira_client, self.base_jql, start_date, end_date, self.config)
+        return fetch_tickets_for_date_range(self.jira_client, self.base_jql, start_date, end_date, self.config, 'executed_only')
             
     def categorize_ticket(self, issue) -> str:
         """Categorize a ticket into one of the team categories"""
