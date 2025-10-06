@@ -57,8 +57,8 @@ add_days() {
     local date_input="$1"
     local days="$2"
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS
-        date -j -f "%Y-%m-%d" "$date_input" -v+"$days"d +"%Y-%m-%d"
+        # macOS - Fixed syntax (move -v before -f)
+        date -j -v+"$days"d -f "%Y-%m-%d" "$date_input" "+%Y-%m-%d"
     else
         # Linux
         date -d "$date_input + $days days" +"%Y-%m-%d"
