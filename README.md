@@ -6,8 +6,9 @@ A comprehensive suite of tools for generating automated team summaries and perfo
 
 ### 📊 Multiple Report Types
 - **📅 Weekly Jira Reports** - Generate weekly team summaries from Jira tickets
+- **🐙 Weekly GitHub Reports** - Sprint-focused GitHub repository activity and contributor insights
 - **📆 Quarterly Jira Reports** - Long-term analysis with contributor performance metrics  
-- **🐙 GitHub Quarterly Reports** - Comprehensive GitHub repository analysis and contributor tracking
+- **📈 GitHub Quarterly Reports** - Comprehensive GitHub repository analysis and contributor tracking
 - **🔄 Cross-Platform Insights** - Combine Jira and GitHub data for complete development visibility
 
 ### 🚀 Advanced Capabilities
@@ -41,6 +42,7 @@ A comprehensive suite of tools for generating automated team summaries and perfo
 | Report Type | Source | Frequency | Output | Use Case |
 |-------------|--------|-----------|--------|----------|
 | **Weekly Jira** | Jira API | Weekly | `team_summary_YYYY-MM-DD_to_YYYY-MM-DD.md` | Sprint reviews, weekly standup prep |
+| **Weekly GitHub** | GitHub API | Weekly | `github_weekly_summary_YYYY-MM-DD_to_YYYY-MM-DD.md` | Sprint demos, code review insights |
 | **Quarterly Jira** | Jira API | Quarterly | `quarterly_summary_QX_YYYY.md` | Performance reviews, quarterly planning |
 | **GitHub Quarterly** | GitHub API | Quarterly | `github_quarterly_summary_QX_YYYY.md` | Code contribution analysis, developer insights |
 
@@ -106,6 +108,15 @@ cp github_config_example.yaml github_config.yaml
 ./run_weekly_summary.sh 2025-09-10 2025-09-16
 ```
 
+#### 🐙 Weekly GitHub Reports
+```bash
+# Generate report for current week
+./run_github_weekly_summary.sh
+
+# Generate report for specific date range
+./run_github_weekly_summary.sh 2025-09-10 2025-09-16
+```
+
 #### 📆 Quarterly Jira Reports
 ```bash
 # Generate report for current quarter
@@ -130,12 +141,14 @@ cp github_config_example.yaml github_config.yaml
 team-reports/
 ├── 📊 Core Report Generators
 │   ├── weekly_team_summary.py           # Weekly Jira reports  
+│   ├── github_weekly_summary.py         # Weekly GitHub reports
 │   ├── quarterly_team_summary.py        # Quarterly Jira reports
 │   └── github_quarterly_summary.py      # GitHub quarterly reports
 ├── 🚀 Execution Scripts  
-│   ├── run_weekly_summary.sh            # Weekly report runner
+│   ├── run_weekly_summary.sh            # Weekly Jira report runner
+│   ├── run_github_weekly_summary.sh     # Weekly GitHub report runner
 │   ├── run_quarterly_summary.sh         # Quarterly Jira report runner
-│   └── run_github_quarterly_summary.sh  # GitHub report runner
+│   └── run_github_quarterly_summary.sh  # GitHub quarterly report runner
 ├── ⚙️ Configuration
 │   ├── env.template                     # Environment template
 │   ├── team_config_example.yaml        # Jira configuration example
@@ -159,9 +172,10 @@ team-reports/
 │   └── DEVELOPER_GUIDE.md            # Development guide
 ├── 📁 Output
 │   └── Reports/                       # Generated reports (auto-created)
-│       ├── team_summary_*.md          # Weekly reports
+│       ├── team_summary_*.md          # Weekly Jira reports
+│       ├── github_weekly_summary_*.md # Weekly GitHub reports
 │       ├── quarterly_summary_*.md     # Quarterly Jira reports
-│       └── github_quarterly_*.md      # GitHub reports
+│       └── github_quarterly_*.md      # GitHub quarterly reports
 ├── 🔧 Dependencies
 │   ├── requirements.txt               # Python package dependencies
 │   └── venv/                         # Virtual environment (create this)
@@ -229,6 +243,32 @@ python3 weekly_team_summary.py 2025-09-10 2025-09-16
 python3 weekly_team_summary.py 2025-09-10 2025-09-16 custom_team_config.yaml
 ```
 
+### 🐙 Weekly GitHub Reports
+
+**Shell Script (Recommended):**
+```bash
+# Generate report for current week
+./run_github_weekly_summary.sh
+
+# Generate report for specific date range
+./run_github_weekly_summary.sh 2025-09-10 2025-09-16
+
+# Custom configuration
+./run_github_weekly_summary.sh 2025-09-10 2025-09-16 custom_github_config.yaml
+```
+
+**Python Direct:**
+```bash
+# Current week
+python3 github_weekly_summary.py
+
+# Specific date range
+python3 github_weekly_summary.py 2025-09-10 2025-09-16
+
+# With custom config
+python3 github_weekly_summary.py 2025-09-10 2025-09-16 custom_config.yaml
+```
+
 ### 📆 Quarterly Jira Reports
 
 **Shell Script (Recommended):**
@@ -285,10 +325,16 @@ python3 github_quarterly_summary.py 2025 4 custom_config.yaml
 
 **Generate all reports for current period:**
 ```bash
-# Weekly + Quarterly Jira + GitHub Quarterly
+# All weekly reports (Jira + GitHub)
 ./run_weekly_summary.sh
+./run_github_weekly_summary.sh
+
+# All quarterly reports (Jira + GitHub)
 ./run_quarterly_summary.sh  
 ./run_github_quarterly_summary.sh
+
+# Complete reporting suite
+./run_weekly_summary.sh && ./run_github_weekly_summary.sh && ./run_quarterly_summary.sh && ./run_github_quarterly_summary.sh
 ```
 
 ## 📊 Report Output
@@ -320,6 +366,44 @@ All reports are generated in clean Markdown format with rich formatting, tables,
 | Ticket ID | Assignee | Priority | Updated | Title |
 |-----------|----------|----------|---------|-------|
 | [PROJ-123](url) | John Doe | Major | 2025-09-13 | Implement new API endpoint |
+```
+
+### 🐙 Weekly GitHub Reports
+
+**Features:**
+- **🔄 Pull Request Activity** - Recent PRs with code change metrics
+- **💻 Commit Tracking** - Individual contributor commit activity
+- **🐛 Issue Updates** - Issues created, updated, and closed during the week
+- **📊 Daily Activity Patterns** - Day-by-day breakdown of development activity
+- **🏆 Top Contributors** - Weekly recognition with contribution metrics
+- **📁 Repository Breakdown** - Activity across multiple repositories
+
+**Example Output:**
+```markdown
+# 🐙 WEEKLY GITHUB SUMMARY: 2025-10-07 to 2025-10-13
+
+### 📊 WEEKLY GITHUB ACTIVITY OVERVIEW
+- **Total Pull Requests:** 23
+- **Total Commits:** 67
+- **Total Issues Updated:** 12
+- **Lines Added:** +2,847
+- **Lines Removed:** -1,234
+- **Active Contributors:** 8
+
+#### 🏆 Top Contributors This Week
+**1. Jane Smith** - 8 PRs, 19 commits, +847/-203 lines
+**2. John Doe** - 5 PRs, 15 commits, +623/-98 lines
+
+## 👥 INDIVIDUAL CONTRIBUTOR DETAILS
+### 👤 Jane Smith
+- **Pull Requests:** 8
+- **Commits:** 19
+- **Code Changes:** +847/-203 lines
+
+#### 🔄 Pull Requests This Week
+| Repository | PR | State | Lines | Title |
+|------------|----|---------|----- |-------|
+| api-service | [#156](url) | merged | +234/-67 | Add user authentication endpoint |
 ```
 
 ### 📆 Quarterly Jira Reports
@@ -377,7 +461,8 @@ All reports are generated in clean Markdown format with rich formatting, tables,
 ### 📁 Output Organization
 
 All reports are saved in the `Reports/` directory with consistent naming:
-- **Weekly**: `team_summary_2025-09-10_to_2025-09-16.md`
+- **Weekly Jira**: `team_summary_2025-09-10_to_2025-09-16.md`
+- **Weekly GitHub**: `github_weekly_summary_2025-09-10_to_2025-09-16.md`
 - **Quarterly Jira**: `quarterly_summary_Q4_2025.md`  
 - **GitHub Quarterly**: `github_quarterly_summary_Q4_2025.md`
 
@@ -654,6 +739,12 @@ logging.basicConfig(level=logging.DEBUG)
 
 ### 🚀 Major New Features
 
+- **✅ GitHub Weekly Reports** - Sprint-focused GitHub repository analysis system
+  - Weekly pull request, commit, and issue activity tracking  
+  - Daily activity patterns and contributor insights for sprint reviews
+  - Code contribution metrics with lines added/removed tracking
+  - Perfect complement to weekly Jira reports for complete sprint visibility
+
 - **✅ GitHub Quarterly Reports** - Complete GitHub repository analysis system
   - Pull request, commit, and issue tracking across multiple repositories
   - Contributor performance analysis with code change metrics
@@ -699,9 +790,10 @@ Your comprehensive Team Reports suite is now ready to use! You can:
 
 ### 📊 Multi-Platform Reporting
 - ✅ **Generate weekly Jira summaries** for sprint reviews and team standups
-- ✅ **Create quarterly Jira analysis** for performance reviews and planning
-- ✅ **Produce GitHub quarterly reports** for code contribution insights
-- ✅ **Combine insights** across Jira tickets and GitHub contributions
+- ✅ **Create weekly GitHub reports** for code contribution and sprint demo insights  
+- ✅ **Produce quarterly Jira analysis** for performance reviews and planning
+- ✅ **Generate GitHub quarterly reports** for long-term code contribution analysis
+- ✅ **Combine insights** across Jira tickets and GitHub contributions for complete visibility
 
 ### 🚀 Advanced Capabilities  
 - ✅ **Smart ticket categorization** with customizable rules and filters
@@ -721,6 +813,7 @@ Your comprehensive Team Reports suite is now ready to use! You can:
 **Start generating reports and transform your team's development data into actionable insights!** 🚀
 
 Choose your report type:
-- `./run_weekly_summary.sh` for sprint insights
-- `./run_quarterly_summary.sh` for performance analysis  
-- `./run_github_quarterly_summary.sh` for code contribution tracking
+- `./run_weekly_summary.sh` for Jira sprint insights
+- `./run_github_weekly_summary.sh` for GitHub sprint insights
+- `./run_quarterly_summary.sh` for Jira performance analysis  
+- `./run_github_quarterly_summary.sh` for GitHub contribution tracking
