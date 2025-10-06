@@ -98,7 +98,8 @@ class WeeklyTeamSummary:
             end_date,
             categorized_tickets,
             self.team_categories,
-            self.format_ticket_info
+            self.format_ticket_info,
+            self.config  # Pass config for categorization flag check
         )
         
     def generate_weekly_summary(self, start_date: str, end_date: str) -> str:

@@ -311,7 +311,7 @@ def save_report(content: str, filename: str, reports_dir: str = "Reports") -> st
 def create_summary_report(title: str, start_date: str, end_date: str,
                          categorized_tickets: Dict[str, List],
                          team_categories: Dict[str, Dict[str, Any]],
-                         format_func) -> str:
+                         format_func, config: Dict[str, Any] = None) -> str:
     """
     Create a complete summary report with all sections.
     
@@ -322,9 +322,14 @@ def create_summary_report(title: str, start_date: str, end_date: str,
         categorized_tickets: Tickets grouped by category
         team_categories: Team category configuration
         format_func: Function to format ticket info
+        config: Configuration dictionary (optional) - controls categorization behavior
         
     Returns:
         str: Complete report as markdown string
+        
+    Note:
+        If config['report']['enable_categorization'] is False, all tickets are shown
+        in a single consolidated section instead of separate category sections.
     """
     report = []
     
@@ -334,15 +339,31 @@ def create_summary_report(title: str, start_date: str, end_date: str,
     # Overview
     report.extend(generate_overview_section(categorized_tickets))
     
-    # Category sections
-    for category_name, category_rules in team_categories.items():
-        tickets = categorized_tickets.get(category_name, [])
-        description = category_rules.get('description', 'No description')
-        report.extend(generate_category_section(category_name, description, tickets, format_func))
+    # Check if categorization is enabled (default: true for backward compatibility)
+    enable_categorization = True
+    if config:
+        enable_categorization = config.get('report', {}).get('enable_categorization', True)
     
-    # Uncategorized section
-    other_tickets = categorized_tickets.get('Other', [])
-    report.extend(generate_uncategorized_section(other_tickets, format_func))
+    if team_categories and enable_categorization:
+        # Category sections (current behavior)
+        for category_name, category_rules in team_categories.items():
+            tickets = categorized_tickets.get(category_name, [])
+            description = category_rules.get('description', 'No description')
+            report.extend(generate_category_section(category_name, description, tickets, format_func))
+        
+        # Uncategorized section
+        other_tickets = categorized_tickets.get('Other', [])
+        report.extend(generate_uncategorized_section(other_tickets, format_func))
+    else:
+        # Consolidated view - all tickets in one section
+        all_tickets = []
+        for category_tickets in categorized_tickets.values():
+            all_tickets.extend(category_tickets)
+        
+        # Sort by updated date (most recent first) for better readability
+        all_tickets.sort(key=lambda ticket: getattr(ticket.fields, 'updated', ''), reverse=True)
+        
+        report.extend(generate_category_section("All Tickets", "Complete ticket overview for the period", all_tickets, format_func))
     
     # Footer
     report.extend(generate_report_footer())
