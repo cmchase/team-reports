@@ -780,185 +780,35 @@ logging.basicConfig(level=logging.DEBUG)
 4. Add tests if applicable
 5. Submit a pull request
 
-## 🗺️ Roadmap & Future Enhancements
+## 🗺️ Roadmap & Future Vision
 
-### 🔮 Planned Features
+Team Reports is designed to evolve from basic automation to a comprehensive **team insights platform**. Our roadmap transforms development data into actionable intelligence for engineering leaders and teams.
 
-Perfect — here’s a **single, polished Markdown roadmap** ready to drop into your repo (e.g., as `ROADMAP.md` or appended to your README).
+### 🚀 **Current Capabilities (Phase 1)**
+- ✅ **Complete Reporting Suite**: Weekly and quarterly reports for both Jira and GitHub
+- ✅ **Multi-Platform Integration**: Unified configuration and time-aligned analysis
+- ✅ **Smart Categorization**: Flexible filtering and customizable team structures
+- ✅ **Enterprise-Ready**: Secure, scalable, and professionally documented
 
-It merges your existing roadmap with the new data-driven and coaching features, grouped into clear, concise phases while maintaining your professional tone and consistent formatting.
+### 🔥 **Next Phase Highlights**
+- **Flow & Delivery Metrics**: Cycle time, WIP tracking, PR lead time analysis
+- **Coaching Insights**: Growth signals and correlation analysis for team development  
+- **Data Quality**: Automated validation with Pass/Warn/Fail indicators
+- **Advanced Analytics**: Trend analysis, predictive insights, and CSV exports
 
----
+### 🎯 **Strategic Vision**
+Transform Team Reports into a platform that empowers engineering teams to **see their progress, friction, and growth patterns** through meaningful insights derived from everyday development activities.
 
-# 🗺️ Project Roadmap
+## 📋 **[→ View Complete Roadmap](ROADMAP.md)**
 
-This roadmap outlines the planned evolution of **Team Reports** — expanding from automated summaries to deeper insights that support team productivity, flow, and growth.
-All new features maintain the same **Markdown-only**, **configuration-driven**, and **API-integrated** design philosophy.
+Our detailed roadmap outlines **6 development phases** with specific features, timelines, and implementation strategies. See [ROADMAP.md](ROADMAP.md) for:
 
----
+- **Detailed feature specifications** for each development phase
+- **Implementation strategies** and technical requirements
+- **Priority matrix** with High/Medium/Future classifications  
+- **Contribution guidelines** for developers interested in building these features
 
-## 🚀 Phase 1 — Current Capabilities (✅ Implemented)
-
-* **Individual Reports**
-
-  * Weekly and quarterly **Jira** reports for team performance and activity.
-  * Weekly and quarterly **GitHub** reports for repository and contributor insights.
-* **Multi-Platform Integration**
-
-  * Separate Jira and GitHub data sources with shared configuration and credentials.
-* **Smart Categorization & Filters**
-
-  * Component-, project-, and keyword-based ticket grouping.
-  * Flexible date ranges and customizable status filters.
-* **Rich Markdown Output**
-
-  * Structured reports with tables, highlights, and contributor summaries.
-* **Automation**
-
-  * Shell script execution for fast report generation.
-* **Extensible Architecture**
-
-  * Modular utilities for configuration, date handling, and API access.
-
----
-
-## 🔥 Phase 2 — Data-Driven Metrics (In Progress)
-
-### Flow Metrics (Jira)
-
-* **Cycle Time** – Time from “In Progress” → “Done” with team median and p90 values.
-* **Work In Progress (WIP)** – Current active tickets per engineer and team total.
-* **Blocked Time** – Total time spent in Blocked or equivalent states.
-
-### Delivery Metrics (GitHub)
-
-* **PR Lead Time** – Duration from first commit → merge, with filtering for trivial PRs.
-* **Review Depth** – Reviewers per PR, number of comments, and review-to-author mapping (bot exclusion supported).
-
-### Data Quality & Guardrails
-
-* Identify missing transition histories, unlinked PR↔Issue relationships, and API fetch gaps.
-* Add **Pass/Warn/Fail badges** and optional `fail_on_error` flag.
-
-### Configuration Centralization
-
-* Add feature flags for each metric (e.g., `metrics.flow.cycle_time`).
-* Centralize thresholds, active states, and bot filters in YAML configuration.
-* Display an active config hash in report footers for traceability.
-
----
-
-## 📈 Phase 3 — Insights & Coaching (Planned)
-
-### Growth & Coaching Signals
-
-Derived indicators to support performance coaching and 1:1 conversations:
-
-* **Autonomy** – % of Jira tickets opened by the assignee.
-* **Collaboration** – Reviews given vs. received per engineer.
-* **Quality Focus** – % of PRs adding tests or documentation.
-* **Rework Ratio** – % of commits editing files modified in the last 14 days.
-* Reports only surface **noteworthy deviations** (beyond ±1 std. dev.) to reduce noise.
-
-### Correlation & Analysis
-
-* **PR Size vs. Cycle Time** – Compute correlation (Pearson r).
-* Output a short interpretive insight line and simple ASCII scatter bins.
-* Enable CSV export for further visualization.
-
-### Gentle Nudges
-
-* Light “nudge” alerts in weekly reports:
-
-  * PRs waiting for review >48h.
-  * Engineers with 0 merged PRs or 0 closed tickets in 10 days.
-  * Consistent WIP over limit for 5+ days.
-* Include JSON export (`nudges.json`) for optional Slack or dashboard integration.
-
----
-
-## 📊 Phase 4 — Longitudinal Insights (Upcoming)
-
-* **Quarterly Trendlines** – ASCII mini-sparklines showing week-over-week trends for:
-
-  * Cycle Time
-  * PR Lead Time
-  * Review Depth
-  * Rework Ratio
-* **CSV Artifact Exports** – Output minimal datasets for dashboards:
-
-  * `flow_cycle_time.csv`
-  * `delivery_prs.csv`
-  * `coaching_signals.csv`
-* **Unified Combined Reports (Optional)** – Create a single weekly file merging Jira + GitHub summaries with aligned time ranges.
-
----
-
-## 🧪 Phase 5 — Quality & Scalability (Future)
-
-* **Testing Coverage** – Raise test coverage for new modules to ≥85%. (Optional)
-* **Fixtures & Stability** – Add deterministic fixtures for Jira/GitHub APIs and date ranges.
-* **Report Polish**
-
-  * Normalize all Markdown table formats.
-  * Add a concise **Glossary** section with metric definitions.
-  * Use inline footnotes (†) linking metrics to glossary anchors.
-* **Change Tracking**
-
-  * Maintain short, imperative changelog entries.
-  * Version report schema changes clearly in output headers.
-
----
-
-## 💡 Phase 6 — Stretch Goals (Exploratory)
-
-* **Jira↔GitHub Auto-Linking**
-
-  * Match PRs and commits to Jira tickets by key in branch names, titles, or commit messages.
-* **Scheduled Reporting**
-
-  * Lightweight cron-based automation for weekly and quarterly report generation.
-* **Slack / Teams Integration**
-
-  * Post summarized Markdown sections directly into team channels.
-* **Dashboard Layer**
-
-  * Optional static-site dashboard rendering CSV data into trend charts.
-* **Multi-Team Support**
-
-  * Generate reports for multiple teams from a single configuration file.
-
----
-
-## 🧭 Implementation Strategy
-
-Each new capability will be developed as **incremental, self-contained commits**:
-
-1. Implement metric or feature.
-2. Add config flag and documentation.
-3. Extend Markdown output and glossary.
-4. Update tests and changelog.
-
----
-
-## ✅ Priority Summary
-
-| Category                            | Focus                                 | Priority  |
-| ----------------------------------- | ------------------------------------- | --------- |
-| **Unified Reports (Jira+GitHub)**   | Cross-platform correlation            | 🔥 High   |
-| **Flow & Delivery Metrics**         | Jira/GitHub performance indicators    | 🔥 High   |
-| **Coaching Signals**                | Growth-oriented insights              | 🔥 High   |
-| **Trend Analysis & CSV Exports**    | Historical and external visualization | 🔧 Medium |
-| **Slack/Dashboard Integrations**    | Quality-of-life enhancements          | 💡 Future |
-| **Scheduling & Multi-Team Support** | Scalability improvements              | 💡 Future |
-
----
-
-### ✨ Goal
-
-Empower engineering leaders and teams to **see their progress, friction, and growth patterns**—all through a simple, private, Markdown-based reporting suite that turns Jira and GitHub data into meaningful, actionable insight.
-
----
+**What's Next?** Check the roadmap for high-priority items I'm looking to implement
 
 ## 📄 License
 
