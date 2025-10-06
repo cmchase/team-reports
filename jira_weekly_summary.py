@@ -44,8 +44,8 @@ class WeeklyTeamSummary:
         self.team_categories = self.config['team_categories']
         
     def _load_config(self, config_file: str) -> Dict[str, Any]:
-        """Load configuration from YAML file"""
-        return load_config(config_file)
+        """Load configuration from YAML file with defaults and environment overrides"""
+        return get_config([config_file])
             
 
         
