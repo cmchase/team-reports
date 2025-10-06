@@ -1,0 +1,41 @@
+# Default Configuration for Team Reports
+# This file defines the baseline configuration structure and default values
+# User configs (team_config.yaml, github_config.yaml) can override these values
+# Environment variables can override both
+
+jira:
+  base_jql: ""
+  server: ""
+
+github:
+  org: ""
+  token: ""
+
+# Future feature flags and metrics (Phase 2+)
+metrics: {}
+
+# Configurable thresholds for analytics
+thresholds: {}
+
+# State mappings for different systems
+states: {}
+
+# Bot accounts to filter out from reports
+bots: []
+
+# Report generation settings
+report:
+  show_active_config: true
+  max_results: 200
+  order_by: "updated DESC"
+  
+# Team structure (will be populated from user configs)
+team_categories: {}
+team_members: {}
+
+# Status filters for different report types  
+status_filters:
+  planned: ["New", "Refinement", "To Do"]
+  execution: ["In Progress", "Review"]
+  completed: ["Closed", "Done"] 
+  all: ["New", "Refinement", "To Do", "In Progress", "Review", "Closed", "Done"]

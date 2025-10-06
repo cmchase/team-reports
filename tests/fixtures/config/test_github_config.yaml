@@ -1,0 +1,18 @@
+# Test GitHub configuration for testing merge functionality
+github:
+  org: "test-org" 
+  token: "test-token-from-file"
+
+team_categories:
+  DevOps:
+    keywords: ["deploy", "infrastructure", "docker"]
+    description: "DevOps and infrastructure work"
+
+# This should override the team_members from user config
+team_members:
+  "github@example.com": "GitHub User"
+  "test@example.com": "Test User (Updated)"  # Override existing
+
+thresholds:
+  pr_lead_time_hours: 24
+  review_time_hours: 4

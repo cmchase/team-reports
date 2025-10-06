@@ -1,0 +1,22 @@
+# Test user configuration for testing merge functionality
+jira:
+  base_jql: "project = TEST AND assignee = currentUser()"
+  server: "https://test-company.atlassian.net"
+
+team_categories:
+  Backend:
+    components: ["API", "Database"]
+    keywords: ["backend", "service"]
+    description: "Backend development work"
+  
+  Frontend:
+    components: ["UI", "React"]
+    keywords: ["frontend", "ui", "react"]
+    description: "Frontend development work"
+
+team_members:
+  "test@example.com": "Test User"
+  "dev@example.com": "Dev User"
+
+report:
+  max_results: 150  # Override default 200

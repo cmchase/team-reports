@@ -1,0 +1,6 @@
+# Minimal test config with just a few overrides
+jira:
+  base_jql: "project = MINIMAL"
+
+report:
+  show_active_config: false
