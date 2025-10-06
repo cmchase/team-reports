@@ -1,0 +1,26 @@
+# Invalid configuration for testing validation
+metrics:
+  flow:
+    cycle_time: "should_be_bool"  # Invalid type
+    wip: true                     # Valid
+  delivery:
+    pr_lead_time: 123            # Invalid type (should be bool)
+  growth:
+    enabled: false               # Valid
+
+thresholds:
+  performance:
+    max_cycle_time: "not_a_number"  # Invalid type (should be number)
+  quality:
+    min_review_depth: 2.5        # Valid number
+
+states:
+  active: ["In Progress", "Review"]  # Valid
+  done: "should_be_list"             # Invalid type
+  blocked: ["Blocked", 123]          # Invalid list content (123 is not str)
+
+bots:
+  patterns: ["bot@", 42, "github-actions"]  # Invalid list content (42 is not str)
+
+report:
+  show_active_config: "yes"      # Invalid type (should be bool)

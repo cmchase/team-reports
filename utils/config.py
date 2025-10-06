@@ -82,30 +82,31 @@ def validate_team_categories(team_categories: Dict[str, Dict[str, Any]]) -> bool
     Expected structure:
         {
             "Category Name": {
+                "description": "Category description",
                 "components": ["Component1", "Component2"],  # Optional
-                "projects": ["PROJECT_KEY"],                 # Optional  
-                "keywords": ["keyword1", "keyword2"],        # Optional
-                "description": "Human readable description"  # Required
+                "projects": ["PROJECT_KEY"],                 # Optional
+                "keywords": ["keyword1", "keyword2"]         # Optional
             }
         }
     """
     if not isinstance(team_categories, dict):
         print("❌ team_categories must be a dictionary")
         return False
+    
+    for category_name, rules in team_categories.items():
+        if not isinstance(rules, dict):
+            print(f"❌ team_categories['{category_name}'] must be a dictionary")
+            return False
         
-    for category_name, category_config in team_categories.items():
-        if not isinstance(category_config, dict):
-            print(f"❌ Category '{category_name}' must be a dictionary")
+        # Check for required description
+        if 'description' not in rules:
+            print(f"❌ team_categories['{category_name}'] missing required 'description' field")
             return False
-            
-        if 'description' not in category_config:
-            print(f"❌ Category '{category_name}' missing required 'description' field")
-            return False
-            
-        # Optional fields validation
+        
+        # Validate optional fields if present
         for field in ['components', 'projects', 'keywords']:
-            if field in category_config and not isinstance(category_config[field], list):
-                print(f"❌ Category '{category_name}' field '{field}' must be a list")
+            if field in rules and not isinstance(rules[field], list):
+                print(f"❌ team_categories['{category_name}']['{field}'] must be a list")
                 return False
     
     return True
@@ -113,18 +114,19 @@ def validate_team_categories(team_categories: Dict[str, Dict[str, Any]]) -> bool
 
 def get_config_value(config: Dict[str, Any], key_path: str, default: Any = None) -> Any:
     """
-    Get a configuration value using dot notation path.
+    Get a nested configuration value using dot notation.
     
     Args:
         config: Configuration dictionary
-        key_path: Dot-separated key path (e.g., 'report_settings.max_results')
-        default: Default value if key path not found
+        key_path: Dot-separated path to the value (e.g., 'report_settings.max_results')
+        default: Default value if key not found
         
     Returns:
-        Configuration value or default
+        Any: Configuration value or default
         
-    Example:
-        max_results = get_config_value(config, 'report_settings.max_results', 100)
+    Examples:
+        max_results = get_config_value(config, 'report_settings.max_results', 200)
+        order_by = get_config_value(config, 'report_settings.order_by', 'updated DESC')
     """
     keys = key_path.split('.')
     value = config
@@ -139,14 +141,14 @@ def get_config_value(config: Dict[str, Any], key_path: str, default: Any = None)
 
 def merge_configs(base_config: Dict[str, Any], override_config: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Merge two configuration dictionaries with override precedence.
+    Merge two configuration dictionaries, with override taking precedence.
     
     Args:
         base_config: Base configuration dictionary
-        override_config: Override configuration (takes precedence)
+        override_config: Override configuration dictionary
         
     Returns:
-        Dict[str, Any]: Merged configuration dictionary
+        Dict[str, Any]: Merged configuration
         
     Example:
         merged = merge_configs(default_config, user_config)
@@ -155,10 +157,10 @@ def merge_configs(base_config: Dict[str, Any], override_config: Dict[str, Any]) 
     
     for key, value in override_config.items():
         if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
-            # Recursively merge nested dictionaries
+            # Recursively merge dictionaries
             merged[key] = merge_configs(merged[key], value)
         else:
-            # Override with new value
+            # Override the value
             merged[key] = value
     
     return merged
@@ -199,19 +201,20 @@ def save_config(config: Dict[str, Any], config_file: str) -> bool:
     
     Args:
         config: Configuration dictionary to save
-        config_file: Path to output YAML file
+        config_file: Path to save the configuration file
         
     Returns:
         bool: True if successful, False otherwise
         
     Example:
-        success = save_config(config, 'my_config.yaml')
+        success = save_config(config, 'my_team_config.yaml')
     """
     try:
         with open(config_file, 'w') as f:
             yaml.dump(config, f, default_flow_style=False, indent=2)
-        print(f"✅ Saved configuration to {config_file}")
+        print(f"✅ Configuration saved to {config_file}")
         return True
+        
     except Exception as e:
         print(f"❌ Error saving configuration: {e}")
         return False
@@ -219,50 +222,50 @@ def save_config(config: Dict[str, Any], config_file: str) -> bool:
 
 def load_config_with_defaults(config_file: str) -> Dict[str, Any]:
     """
-    Load configuration with default fallbacks.
+    Load configuration file with default values as fallback.
     
     Args:
-        config_file: Path to configuration file
+        config_file: Path to the configuration file
         
     Returns:
-        Dict[str, Any]: Merged configuration with defaults
+        Dict[str, Any]: Configuration with defaults applied
         
     Example:
         config = load_config_with_defaults('team_config.yaml')
     """
-    defaults = get_default_config()
+    default_config = get_default_config()
     
     try:
         user_config = load_config(config_file)
-        return merge_configs(defaults, user_config)
+        return merge_configs(default_config, user_config)
     except SystemExit:
-        print("⚠️  Using default configuration only")
-        return defaults
+        print("⚠️  Using default configuration")
+        return default_config
 
 
 def get_team_member_name(config: Dict[str, Any], email: str) -> str:
     """
-    Get display name for a team member by email.
+    Get the display name for a team member by their email address.
     
     Args:
-        config: Configuration dictionary
+        config: Configuration dictionary containing team_members
         email: Email address to look up
         
     Returns:
-        str: Display name or email if not found
+        str: Display name if found, otherwise email address
         
     Example:
-        name = get_team_member_name(config, 'john@company.com')
-        # Returns "John Doe" or "john@company.com" if not mapped
+        name = get_team_member_name(config, "user@company.com")
+        # Returns "John Doe" or "user@company.com" if not found
     """
     team_members = config.get('team_members', {})
     
-    # Handle both old list format and new dict format
+    # Handle both old list format and new dict format for backward compatibility
     if isinstance(team_members, list):
         # Old format: return email as-is
         return email
     elif isinstance(team_members, dict):
-        # New format: look up display name
+        # New format: lookup name by email
         return team_members.get(email, email)
     else:
         return email
@@ -270,25 +273,24 @@ def get_team_member_name(config: Dict[str, Any], email: str) -> str:
 
 def get_all_team_member_emails(config: Dict[str, Any]) -> List[str]:
     """
-    Get all team member email addresses.
+    Get all team member email addresses from the configuration.
     
     Args:
-        config: Configuration dictionary
+        config: Configuration dictionary containing team_members
         
     Returns:
         List[str]: List of email addresses
         
     Example:
         emails = get_all_team_member_emails(config)
-        # Returns ['john@company.com', 'jane@company.com', ...]
+        # Returns ["user1@company.com", "user2@company.com", ...]
     """
     team_members = config.get('team_members', {})
     
+    # Handle both old list format and new dict format
     if isinstance(team_members, list):
-        # Old format: emails are the list items
-        return list(team_members)
+        return team_members
     elif isinstance(team_members, dict):
-        # New format: emails are the keys
         return list(team_members.keys())
     else:
         return []
@@ -296,13 +298,13 @@ def get_all_team_member_emails(config: Dict[str, Any]) -> List[str]:
 
 def get_team_members_dict(config: Dict[str, Any]) -> Dict[str, str]:
     """
-    Get team members dictionary from configuration.
+    Get team members as a dictionary mapping email to display name.
     
     Args:
-        config: Configuration dictionary
+        config: Configuration dictionary containing team_members
         
     Returns:
-        Dict[str, str]: Dictionary mapping emails to display names
+        Dict[str, str]: Dictionary mapping email to display name
         
     Example:
         members = get_team_members_dict(config)
@@ -324,6 +326,153 @@ def get_team_members_dict(config: Dict[str, Any]) -> Dict[str, str]:
 # =============================================================================
 # NEW CONFIGURATION MANAGEMENT SYSTEM
 # =============================================================================
+
+class ConfigError(Exception):
+    """Exception raised when configuration validation fails in strict mode."""
+    pass
+
+
+# Configuration validation rules - defines expected types for specific paths
+VALIDATION_RULES = {
+    # Metrics feature flags
+    'metrics.flow.cycle_time': bool,
+    'metrics.flow.wip': bool, 
+    'metrics.flow.blocked_time': bool,
+    'metrics.delivery.pr_lead_time': bool,
+    'metrics.delivery.review_depth': bool,
+    'metrics.growth.enabled': bool,
+    
+    # Configurable thresholds (any nested number under thresholds)
+    'thresholds.*.*': (int, float),
+    
+    # State mappings
+    'states.active': list,
+    'states.done': list, 
+    'states.blocked': list,
+    
+    # Bot filtering patterns
+    'bots.patterns': list,
+    
+    # Report settings
+    'report.show_active_config': bool,
+}
+
+
+def _get_nested_value(config: Dict[str, Any], path: str) -> Any:
+    """
+    Get a value from nested dictionary using dot notation.
+    
+    Args:
+        config: Configuration dictionary
+        path: Dot-separated path (e.g., 'metrics.flow.cycle_time')
+        
+    Returns:
+        Value at path, or None if path doesn't exist
+    """
+    keys = path.split('.')
+    value = config
+    
+    try:
+        for key in keys:
+            if key == '*':
+                # Wildcard - return the current dict for further processing
+                return value
+            value = value[key]
+        return value
+    except (KeyError, TypeError):
+        return None
+
+
+def _validate_wildcard_path(config: Dict[str, Any], path: str, expected_type: type) -> List[str]:
+    """
+    Validate paths with wildcards (e.g., 'thresholds.*.*').
+    
+    Args:
+        config: Configuration dictionary
+        path: Path with wildcards
+        expected_type: Expected type for values
+        
+    Returns:
+        List of validation error messages
+    """
+    errors = []
+    path_parts = path.split('.')
+    
+    # Find the position of the first wildcard
+    wildcard_idx = next((i for i, part in enumerate(path_parts) if part == '*'), None)
+    if wildcard_idx is None:
+        return errors
+    
+    # Get the base path (before wildcards)
+    base_path = '.'.join(path_parts[:wildcard_idx])
+    base_value = _get_nested_value(config, base_path) if base_path else config
+    
+    if base_value is None or not isinstance(base_value, dict):
+        return errors
+    
+    # Validate all nested values under the wildcard path
+    remaining_wildcards = path_parts[wildcard_idx + 1:]
+    
+    for key, value in base_value.items():
+        current_path = f"{base_path}.{key}" if base_path else key
+        
+        if len(remaining_wildcards) == 0:
+            # No more wildcards, validate the type
+            if not isinstance(value, expected_type):
+                actual_type = type(value).__name__
+                expected_name = expected_type.__name__ if hasattr(expected_type, '__name__') else str(expected_type)
+                errors.append(f"'{current_path}': expected {expected_name}, got {actual_type}")
+        elif remaining_wildcards[0] == '*' and isinstance(value, dict):
+            # More wildcards to process
+            wildcard_path = '.'.join([current_path] + remaining_wildcards)
+            errors.extend(_validate_wildcard_path(config, wildcard_path, expected_type))
+    
+    return errors
+
+
+def validate_config(config: Dict[str, Any]) -> List[str]:
+    """
+    Validate configuration against defined rules.
+    
+    Args:
+        config: Configuration dictionary to validate
+        
+    Returns:
+        List of human-readable error messages. Empty if valid.
+        
+    Validation Rules:
+        - Type checking for specific configuration paths
+        - Wildcard path support (e.g., thresholds.*.*)  
+        - Clear error messages with actual vs expected types
+        
+    Example:
+        errors = validate_config(config)
+        if errors:
+            print("Configuration errors:", errors)
+    """
+    errors = []
+    
+    for rule_path, expected_type in VALIDATION_RULES.items():
+        if '*' in rule_path:
+            # Handle wildcard paths
+            errors.extend(_validate_wildcard_path(config, rule_path, expected_type))
+        else:
+            # Handle specific paths
+            value = _get_nested_value(config, rule_path)
+            
+            if value is not None:  # Only validate if the path exists
+                if not isinstance(value, expected_type):
+                    actual_type = type(value).__name__
+                    expected_name = expected_type.__name__ if hasattr(expected_type, '__name__') else str(expected_type)
+                    errors.append(f"'{rule_path}': expected {expected_name}, got {actual_type}")
+                    
+                # Special validation for list contents
+                if isinstance(value, list) and rule_path.endswith(('states.active', 'states.done', 'states.blocked', 'bots.patterns')):
+                    for i, item in enumerate(value):
+                        if not isinstance(item, str):
+                            errors.append(f"'{rule_path}[{i}]': expected str, got {type(item).__name__}")
+    
+    return errors
 
 def load_default_config() -> Dict[str, Any]:
     """
@@ -514,4 +663,20 @@ def get_config(paths: Optional[List[str]] = None) -> Dict[str, Any]:
         print(f"⚠️  Error loading env overrides: {e}")
     
     print("🎯 Configuration loading complete")
+    
+    # Step 4: Validate configuration
+    validation_errors = validate_config(config)
+    
+    if validation_errors:
+        error_message = f"Configuration validation failed:\n" + "\n".join(f"  - {error}" for error in validation_errors)
+        
+        # Check if strict mode is enabled
+        strict_mode = os.getenv('TEAM_REPORTS_STRICT_CONFIG', '0') == '1'
+        
+        if strict_mode:
+            raise ConfigError(error_message)
+        else:
+            print(f"⚠️  {error_message}")
+            print("⚠️  Continuing with invalid configuration (set TEAM_REPORTS_STRICT_CONFIG=1 for strict mode)")
+    
     return config

@@ -1,0 +1,30 @@
+# Valid configuration for testing validation
+metrics:
+  flow:
+    cycle_time: true
+    wip: false
+    blocked_time: true
+  delivery:
+    pr_lead_time: true
+    review_depth: false
+  growth:
+    enabled: true
+
+thresholds:
+  performance:
+    max_cycle_time: 48
+    avg_lead_time: 24.5
+  quality:
+    min_review_depth: 2
+    max_review_time: 4.0
+
+states:
+  active: ["In Progress", "Review", "Testing"]
+  done: ["Closed", "Done", "Resolved"]
+  blocked: ["Blocked", "On Hold"]
+
+bots:
+  patterns: ["bot@company.com", "github-actions", "dependabot"]
+
+report:
+  show_active_config: true
