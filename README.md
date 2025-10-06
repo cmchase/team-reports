@@ -780,6 +780,64 @@ logging.basicConfig(level=logging.DEBUG)
 4. Add tests if applicable
 5. Submit a pull request
 
+## 🗺️ Roadmap & Future Enhancements
+
+### 🔮 Planned Features
+
+#### **🔗 Cross-Platform Integration**
+- **Jira-GitHub Correlation**: Automatically link Jira ticket keys found in GitHub commit messages and PR descriptions
+- **Unified Reports**: Generate combined reports showing both ticket completion and code contribution metrics side-by-side
+- **Contributor Matching**: Cross-reference team members between Jira assignees and GitHub contributors for complete activity tracking
+- **Sprint Velocity Analysis**: Correlate story points completed with code changes to analyze development patterns
+
+#### **📊 Enhanced Analytics**
+- **Trend Analysis**: Historical tracking of team performance across multiple quarters
+- **Burndown Charts**: Visual progress tracking for sprints and quarters
+- **Code Quality Metrics**: Integration with code analysis tools for comprehensive development insights
+- **Predictive Analytics**: Sprint capacity planning based on historical performance data
+
+#### **🚀 Workflow Improvements**  
+- **Automated Scheduling**: Configurable report generation on schedule (daily/weekly/monthly)
+- **Slack/Teams Integration**: Automatic posting of report summaries to team channels
+- **Dashboard Generation**: Web-based dashboard for real-time metrics visualization
+- **Multi-Team Support**: Parallel report generation for multiple teams from single configuration
+
+#### **⚙️ Technical Enhancements**
+- **Docker Support**: Containerized deployment for consistent environments
+- **CI/CD Integration**: GitHub Actions/Jenkins plugins for automated reporting
+- **Database Storage**: Optional database backend for historical report data and analytics
+- **REST API**: Web API for programmatic access to report generation and data
+
+#### **📈 Advanced Reporting**
+- **Executive Summaries**: High-level reports for leadership with key metrics and trends
+- **Performance Reviews**: Individual contributor reports with comprehensive metrics
+- **Release Notes Generation**: Automatic generation based on completed tickets and merged PRs
+- **Custom Report Templates**: User-defined report formats and layouts
+
+### 🎯 **How to Contribute to Roadmap Items**
+
+Interested in implementing any of these features? Here's how to get started:
+
+1. **Check existing issues** for related discussions
+2. **Open a feature request** to discuss the approach
+3. **Review the [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** for architecture details
+4. **Start with the utilities package** - most enhancements can leverage existing infrastructure
+5. **Follow existing patterns** for consistency with current codebase
+
+### 📋 **Current Capabilities vs Roadmap**
+
+| Feature | Current Status | Roadmap Priority |
+|---------|---------------|------------------|
+| **Individual Reports** | ✅ Implemented | - |
+| **Multi-Platform Reports** | ✅ Separate reports | 🔥 High - Unified reports |
+| **Time-Aligned Analysis** | ✅ Manual correlation | 🔥 High - Automated correlation |
+| **Basic Analytics** | ✅ Count-based metrics | 🔥 High - Trend analysis |
+| **Shell Script Execution** | ✅ Implemented | 🔧 Medium - Web interface |
+| **Markdown Output** | ✅ Implemented | 🔧 Medium - Multiple formats |
+| **Team Configuration** | ✅ YAML-based | 🔧 Medium - Multi-team support |
+
+**Priority Legend:** 🔥 High | 🔧 Medium | 💡 Future
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
@@ -793,7 +851,7 @@ Your comprehensive Team Reports suite is now ready to use! You can:
 - ✅ **Create weekly GitHub reports** for code contribution and sprint demo insights  
 - ✅ **Produce quarterly Jira analysis** for performance reviews and planning
 - ✅ **Generate GitHub quarterly reports** for long-term code contribution analysis
-- ✅ **Combine insights** across Jira tickets and GitHub contributions for complete visibility
+- ✅ **Generate complementary reports** from both Jira tickets and GitHub contributions for the same time periods
 
 ### 🚀 Advanced Capabilities  
 - ✅ **Smart ticket categorization** with customizable rules and filters
@@ -802,6 +860,7 @@ Your comprehensive Team Reports suite is now ready to use! You can:
 - ✅ **Rich Markdown output** with tables, links, and visual indicators
 - ✅ **Automated execution** via convenient shell scripts
 - ✅ **Extensible architecture** using modular utilities package
+- ✅ **Time-aligned reporting** enabling side-by-side analysis of Jira and GitHub activities
 
 ### 🛠️ Enterprise Ready
 - ✅ **Secure credential management** with environment variables
