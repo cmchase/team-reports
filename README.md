@@ -87,8 +87,8 @@ GITHUB_TOKEN=your-github-personal-access-token
 
 **For Jira Reports:**
 ```bash
-cp team_config_example.yaml team_config.yaml
-# Edit team_config.yaml with your team's projects, members, and categorization rules
+cp jira_config_example.yaml jira_config.yaml
+# Edit jira_config.yaml with your team's projects, members, and categorization rules
 ```
 
 **For GitHub Reports:**
@@ -151,9 +151,9 @@ team-reports/
 │   └── run_github_quarterly_summary.sh  # GitHub quarterly report runner
 ├── ⚙️ Configuration
 │   ├── env.template                     # Environment template
-│   ├── team_config_example.yaml        # Jira configuration example
+│   ├── jira_config_example.yaml        # Jira configuration example
 │   ├── github_config_example.yaml      # GitHub configuration example
-│   ├── team_config.yaml               # Your Jira config (create this)
+│   ├── jira_config.yaml               # Your Jira config (create this)
 │   ├── github_config.yaml             # Your GitHub config (create this)  
 │   └── .env                           # API credentials (create this)
 ├── 🛠️ Utilities Package
@@ -221,7 +221,7 @@ Team Reports uses a **layered configuration system** with deterministic preceden
 
 ```
 1. config/default_config.yaml    (Base defaults)
-2. team_config.yaml              (User YAML files)  
+2. jira_config.yaml              (User YAML files)  
 3. github_config.yaml            (User YAML files)
 4. .env environment overrides    (Highest priority)
 ```
@@ -264,7 +264,7 @@ python3 jira_weekly_summary.py
 python3 jira_weekly_summary.py 2025-09-10 2025-09-16
 
 # Custom configuration
-python3 jira_weekly_summary.py 2025-09-10 2025-09-16 custom_team_config.yaml
+python3 jira_weekly_summary.py 2025-09-10 2025-09-16 custom_jira_config.yaml
 ```
 
 ### 🐙 Weekly GitHub Reports
@@ -304,7 +304,7 @@ python3 github_weekly_summary.py 2025-09-10 2025-09-16 custom_config.yaml
 ./run_jira_quarterly_summary.sh 2025 4
 
 # Custom configuration  
-./run_jira_quarterly_summary.sh 2025 4 custom_team_config.yaml
+./run_jira_quarterly_summary.sh 2025 4 custom_jira_config.yaml
 ```
 
 **Python Direct:**
@@ -492,7 +492,7 @@ All reports are saved in the `Reports/` directory with consistent naming:
 
 ## ⚙️ Configuration
 
-### Jira Configuration (`team_config.yaml`)
+### Jira Configuration (`jira_config.yaml`)
 
 **For Weekly & Quarterly Jira Reports**
 
@@ -608,7 +608,7 @@ GITHUB_TOKEN=your-github-personal-access-token
 
 ### Adding New Jira Categories
 
-1. **Edit `team_config.yaml`**
+1. **Edit `jira_config.yaml`**
 2. **Add new category** under `team_categories`
 3. **Define matching rules** (components, projects, keywords)
 4. **Regenerate reports** to see new categorization
@@ -690,7 +690,7 @@ save_report(content, filename)
 ### 🔐 Credential Management
 - **Never commit `.env` file** - Contains sensitive API tokens and credentials
 - **Never commit configuration files with real data**:
-  - `team_config.yaml` - Contains team-specific Jira information
+  - `jira_config.yaml` - Contains team-specific Jira information
   - `github_config.yaml` - Contains GitHub repository and team data
 - **Use example files as templates** - Copy from `*_example.yaml` files
 - **Store credentials securely** - Use `.env` file for all API tokens
@@ -707,7 +707,7 @@ save_report(content, filename)
 **Files properly ignored in `.gitignore`:**
 ```
 .env                    # API credentials
-team_config.yaml        # Team-specific Jira config  
+jira_config.yaml        # Team-specific Jira config  
 github_config.yaml      # GitHub repositories and team mapping
 Reports/                # Generated reports (may contain sensitive data)
 ```
@@ -736,13 +736,13 @@ run_*.sh               # Execution scripts
    - Test your Jira credentials by logging into Jira directly
 
 3. **No Tickets Found**
-   - Check your JQL filter in `team_config.yaml`
+   - Check your JQL filter in `jira_config.yaml`
    - Verify date range is correct
    - Ensure you have access to the projects
    - Test the JQL query directly in Jira
 
 4. **Configuration Error**
-   - Validate YAML syntax in `team_config.yaml`
+   - Validate YAML syntax in `jira_config.yaml`
    - Check file permissions
    - Ensure all required fields are present
 

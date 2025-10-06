@@ -14,18 +14,18 @@ The tool has been refactored to use external configuration files, making it easy
 
 ### 1. Copy Configuration Template
 ```bash
-cp team_config_example.yaml my_team_config.yaml
+cp jira_config_example.yaml my_jira_config.yaml
 ```
 
 ### 2. Edit Your Configuration
 ```bash
 # Edit the config file for your team
-nano my_team_config.yaml
+nano my_jira_config.yaml
 ```
 
 ### 3. Run with Your Config
 ```bash
-python3 weekly_team_summary.py 2025-07-15 2025-07-22 my_team_config.yaml
+python3 weekly_team_summary.py 2025-07-15 2025-07-22 my_jira_config.yaml
 ```
 
 ## ⚙️ Configuration File Structure

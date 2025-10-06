@@ -1,6 +1,6 @@
 # Default Configuration for Team Reports
 # This file defines the baseline configuration structure and default values
-# User configs (team_config.yaml, github_config.yaml) can override these values
+# User configs (jira_config.yaml, github_config.yaml) can override these values
 # Environment variables can override both
 
 jira:

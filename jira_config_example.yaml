@@ -1,5 +1,5 @@
 # Example Team Summary Configuration
-# Copy this file to team_config.yaml and customize for your team
+# Copy this file to jira_config.yaml and customize for your team
 
 # Base JQL filter - modify this to include your team's projects, components, and team members
 base_jql: |

@@ -78,9 +78,9 @@ team_summary_*.md
 team_summary_*.txt
 
 # Personal team configuration files (contains sensitive team data)
-team_config.yaml
-*_team_config.yaml
-my_team_config.yaml
+jira_config.yaml
+*_jira_config.yaml
+my_jira_config.yaml
 backend_team.yaml
 frontend_team.yaml
 security_team.yaml

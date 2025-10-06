@@ -337,6 +337,7 @@ class GitHubWeeklySummary:
                 lines_added = performance['contributor_lines_added'].get(contributor, 0)
                 lines_removed = performance['contributor_lines_removed'].get(contributor, 0)
                 overview.append(f"**{i}. {contributor}** - {count} PRs, {commits} commits, +{lines_added}/-{lines_removed} lines")
+                overview.append("")
             overview.append("")
 
         return overview

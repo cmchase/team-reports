@@ -32,7 +32,7 @@ cd "$SCRIPT_DIR"
 # Default values
 YEAR=""
 QUARTER=""
-CONFIG_FILE="team_config.yaml"
+CONFIG_FILE="jira_config.yaml"
 VIRTUAL_ENV_PATH="./venv"
 PYTHON_SCRIPT="jira_quarterly_summary.py"
 
@@ -56,7 +56,7 @@ print_usage() {
     echo -e "${CYAN}Examples:${NC}"
     echo "  $0                           # Current quarter with default config"
     echo "  $0 2025 1                    # Q1 2025 report"
-    echo "  $0 2025 3 team_config.yaml  # Q3 2025 with specific config"
+    echo "  $0 2025 3 jira_config.yaml  # Q3 2025 with specific config"
     echo ""
 }
 
@@ -133,7 +133,7 @@ check_config_file() {
         print_error "Configuration file '$CONFIG_FILE' not found!"
         echo ""
         echo "Please create a configuration file. You can:"
-        echo "1. Copy team_config_example.yaml to $CONFIG_FILE"
+        echo "1. Copy jira_config_example.yaml to $CONFIG_FILE"
         echo "2. Follow the CONFIGURATION_GUIDE.md for setup instructions"
         exit 1
     fi
@@ -175,7 +175,7 @@ generate_quarterly_summary() {
         print_info "Generating summary for current quarter"
     fi
     
-    if [[ "$CONFIG_FILE" != "team_config.yaml" ]]; then
+    if [[ "$CONFIG_FILE" != "jira_config.yaml" ]]; then
         CMD_ARGS+=("$CONFIG_FILE")
         print_info "Using config file: $CONFIG_FILE"
     fi
@@ -198,7 +198,7 @@ generate_quarterly_summary() {
         echo ""
         echo "Common troubleshooting steps:"
         echo "1. Check your .env file and JIRA credentials"
-        echo "2. Verify your team_config.yaml is properly formatted"
+        echo "2. Verify your jira_config.yaml is properly formatted"
         echo "3. Ensure you have network access to your JIRA instance"
         echo "4. Check that the date range contains valid tickets"
         exit 1
