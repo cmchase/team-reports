@@ -114,8 +114,8 @@ class TestGenerateReportHeader:
         
         assert len(header_lines) > 0
         assert any("TEST REPORT" in line for line in header_lines)
-        assert any("2025-01-01" in line for line in header_lines)
-        assert any("2025-01-07" in line for line in header_lines)
+        # Note: dates are no longer included in header after fixing title duplication issue
+        assert any("Generated:" in line for line in header_lines)
     
     def test_generate_header_with_metadata(self):
         """Test header includes generation timestamp."""

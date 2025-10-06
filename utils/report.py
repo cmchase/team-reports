@@ -101,7 +101,7 @@ def generate_report_header(title: str, start_date: str, end_date: str) -> List[s
         List[str]: Report header lines
     """
     return [
-        f"## 📊 {title.upper()}: {start_date} to {end_date}",
+        f"## 📊 {title.upper()}",
         "",
         f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         ""
@@ -258,7 +258,29 @@ def generate_filename(prefix: str, start_date: str, end_date: str,
         filename = generate_filename('jira_weekly_summary', '2025-01-01', '2025-01-07')
         # Returns: 'jira_weekly_summary_2025-01-01_to_2025-01-07.md'
     """
-    return f"{prefix}_{start_date}_to_{end_date}.{extension}"
+    # Defensive programming: Clean up dates to ensure YYYY-MM-DD format
+    def clean_date(date_input):
+        """Extract YYYY-MM-DD from various date formats"""
+        date_str = str(date_input)
+        
+        # If it's already in YYYY-MM-DD format, return as-is
+        import re
+        if re.match(r'^\d{4}-\d{2}-\d{2}$', date_str):
+            return date_str
+            
+        # Try to extract YYYY-MM-DD from datetime strings
+        # Look for pattern like "2025-09-06" within the string
+        match = re.search(r'\b(\d{4}-\d{2}-\d{2})\b', date_str)
+        if match:
+            return match.group(1)
+            
+        # If we can't extract a valid date, this is an error
+        raise ValueError(f"Cannot extract valid date from: '{date_input}' (expected YYYY-MM-DD format)")
+    
+    clean_start = clean_date(start_date)
+    clean_end = clean_date(end_date)
+    
+    return f"{prefix}_{clean_start}_to_{clean_end}.{extension}"
 
 
 def save_report(content: str, filename: str, reports_dir: str = "Reports") -> str:

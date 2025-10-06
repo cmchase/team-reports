@@ -230,6 +230,10 @@ def main():
         from utils.date import parse_date_args as parse_date_args_util
         start_date, end_date = parse_date_args_util(date_args)
         
+        # Defensive programming: Ensure dates are strings in YYYY-MM-DD format
+        start_date = str(start_date).split()[0] if ' ' in str(start_date) else str(start_date)
+        end_date = str(end_date).split()[0] if ' ' in str(end_date) else str(end_date)
+        
         print(f"🚀 Generating weekly team summary for {start_date} to {end_date}")
         print("=" * 60)
         
