@@ -121,11 +121,38 @@ def main():
             config_file = sys.argv[3]
             print(f"📝 Using custom config file: {config_file}")
         
+        # Load configuration and setup feature flags
+        config = get_config([config_file])
+        
+        # Helper function for clean feature flag checks
+        def flag(path: str) -> bool:
+            """Check if a feature flag is enabled in config"""
+            keys = path.split('.')
+            value = config
+            try:
+                for key in keys:
+                    value = value[key]
+                return bool(value)
+            except (KeyError, TypeError):
+                return False
+        
+        # Feature flags for Jira flow metrics (Phase 2+)
+        enable_cycle_time = flag("metrics.flow.cycle_time")
+        enable_wip = flag("metrics.flow.wip") 
+        enable_blocked_time = flag("metrics.flow.blocked_time")
+        
         summary_generator = WeeklyTeamSummary(config_file)
         report = summary_generator.generate_weekly_summary(start_date, end_date)
         
+        # TODO: Future metrics sections (Phase 2+)
+        # if enable_cycle_time:
+        #     report += generate_cycle_time_analysis(tickets, start_date, end_date)
+        # if enable_wip:
+        #     report += generate_wip_analysis(tickets, start_date, end_date)  
+        # if enable_blocked_time:
+        #     report += generate_blocked_time_analysis(tickets, start_date, end_date)
+        
         # Append active configuration block
-        config = get_config([config_file])
         config_block = render_active_config(config)
         full_report = report + config_block
         

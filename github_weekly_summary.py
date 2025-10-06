@@ -489,14 +489,38 @@ def main():
     start_date, end_date = parse_date_args(args)
     
     try:
+        # Load configuration and setup feature flags
+        config = get_config([config_file])
+        
+        # Helper function for clean feature flag checks
+        def flag(path: str) -> bool:
+            """Check if a feature flag is enabled in config"""
+            keys = path.split('.')
+            value = config
+            try:
+                for key in keys:
+                    value = value[key]
+                return bool(value)
+            except (KeyError, TypeError):
+                return False
+        
+        # Feature flags for GitHub delivery metrics (Phase 2+)
+        enable_pr_lead_time = flag("metrics.delivery.pr_lead_time")
+        enable_review_depth = flag("metrics.delivery.review_depth")
+        
         # Initialize the summary generator
         summary_generator = GitHubWeeklySummary(config_file)
         
         # Generate the report
         report_content = summary_generator.generate_report(start_date, end_date, config_file)
         
+        # TODO: Future GitHub metrics sections (Phase 2+)
+        # if enable_pr_lead_time:
+        #     report_content += generate_pr_lead_time_analysis(prs, start_date, end_date)
+        # if enable_review_depth:
+        #     report_content += generate_review_depth_analysis(prs, start_date, end_date)
+        
         # Append active configuration block
-        config = get_config([config_file])
         config_block = render_active_config(config)
         full_report = report_content + config_block
         

@@ -496,14 +496,38 @@ def main():
             config_file = sys.argv[3]
             print(f"📝 Using custom config file: {config_file}")
         
+        # Load configuration and setup feature flags
+        config = get_config([config_file])
+        
+        # Helper function for clean feature flag checks
+        def flag(path: str) -> bool:
+            """Check if a feature flag is enabled in config"""
+            keys = path.split('.')
+            value = config
+            try:
+                for key in keys:
+                    value = value[key]
+                return bool(value)
+            except (KeyError, TypeError):
+                return False
+        
+        # Feature flags for GitHub delivery metrics (Phase 2+)
+        enable_pr_lead_time = flag("metrics.delivery.pr_lead_time")
+        enable_review_depth = flag("metrics.delivery.review_depth")
+        
         # Initialize the summary generator
         summary_generator = GitHubQuarterlySummary(config_file)
         
         # Generate the complete quarterly report
         report = summary_generator.generate_quarterly_summary(year, quarter)
         
+        # TODO: Future quarterly GitHub metrics sections (Phase 2+)
+        # if enable_pr_lead_time:
+        #     report += generate_quarterly_pr_lead_time_trends(prs, year, quarter)
+        # if enable_review_depth:
+        #     report += generate_quarterly_review_depth_trends(prs, year, quarter)
+        
         # Append active configuration block
-        config = get_config([config_file])
         config_block = render_active_config(config)
         full_report = report + config_block
         
