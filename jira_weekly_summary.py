@@ -9,12 +9,12 @@ Generates weekly summaries of team work based on Jira tickets, categorized by te
 4. Edge Decommission
 
 Usage:
-    python3 weekly_team_summary.py [start_date] [end_date] [config_file]
+    python3 jira_weekly_summary.py [start_date] [end_date] [config_file]
     
 Examples:
-    python3 weekly_team_summary.py 2025-07-15 2025-07-22
-    python3 weekly_team_summary.py  # Uses current week
-    python3 weekly_team_summary.py 2025-07-15 2025-07-22 custom_team_config.yaml
+    python3 jira_weekly_summary.py 2025-07-15 2025-07-22
+    python3 jira_weekly_summary.py  # Uses current week
+    python3 jira_weekly_summary.py 2025-07-15 2025-07-22 custom_team_config.yaml
 """
 
 import sys
@@ -125,7 +125,7 @@ def main():
         report = summary_generator.generate_weekly_summary(start_date, end_date)
         
         # Save report using utility functions
-        filename = generate_filename('team_summary', start_date, end_date)
+        filename = generate_filename('jira_weekly_summary', start_date, end_date)
         filepath = save_report(report, filename)
         
         print("\n" + report)

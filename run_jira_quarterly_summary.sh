@@ -8,9 +8,9 @@
 # comprehensive analysis of team performance, trends, and insights.
 #
 # Usage:
-#   ./run_quarterly_summary.sh                    # Current quarter
-#   ./run_quarterly_summary.sh 2025 4            # Specific quarter  
-#   ./run_quarterly_summary.sh 2025 4 config.yaml # With custom config
+#   ./run_jira_quarterly_summary.sh                    # Current quarter
+#   ./run_jira_quarterly_summary.sh 2025 4            # Specific quarter  
+#   ./run_jira_quarterly_summary.sh 2025 4 config.yaml # With custom config
 #
 # =============================================================================
 
@@ -34,7 +34,7 @@ YEAR=""
 QUARTER=""
 CONFIG_FILE="team_config.yaml"
 VIRTUAL_ENV_PATH="./venv"
-PYTHON_SCRIPT="quarterly_team_summary.py"
+PYTHON_SCRIPT="jira_quarterly_summary.py"
 
 # =============================================================================
 # Helper Functions

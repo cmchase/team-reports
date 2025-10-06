@@ -244,7 +244,7 @@ def generate_filename(prefix: str, start_date: str, end_date: str,
     Generate a standardized filename for reports.
     
     Args:
-        prefix: Filename prefix (e.g., 'team_summary', 'sprint_report')
+        prefix: Filename prefix (e.g., 'jira_weekly_summary', 'github_weekly_summary')
         start_date: Start date in YYYY-MM-DD format
         end_date: End date in YYYY-MM-DD format
         extension: File extension (default: 'md')
@@ -253,8 +253,8 @@ def generate_filename(prefix: str, start_date: str, end_date: str,
         str: Generated filename
         
     Example:
-        filename = generate_filename('team_summary', '2025-01-01', '2025-01-07')
-        # Returns: 'team_summary_2025-01-01_to_2025-01-07.md'
+        filename = generate_filename('jira_weekly_summary', '2025-01-01', '2025-01-07')
+        # Returns: 'jira_weekly_summary_2025-01-01_to_2025-01-07.md'
     """
     return f"{prefix}_{start_date}_to_{end_date}.{extension}"
 
@@ -272,7 +272,7 @@ def save_report(content: str, filename: str, reports_dir: str = "Reports") -> st
         str: Full path to the saved file
         
     Example:
-        filepath = save_report(report_content, 'team_summary.md')
+        filepath = save_report(report_content, 'jira_weekly_summary.md')
     """
     reports_path = ensure_reports_directory(reports_dir)
     filepath = os.path.join(reports_path, filename)

@@ -102,10 +102,10 @@ cp github_config_example.yaml github_config.yaml
 #### 📅 Weekly Jira Reports
 ```bash
 # Generate report for last 7 days
-./run_weekly_summary.sh
+./run_jira_weekly_summary.sh
 
 # Generate report for specific date range  
-./run_weekly_summary.sh 2025-09-10 2025-09-16
+./run_jira_weekly_summary.sh 2025-09-10 2025-09-16
 ```
 
 #### 🐙 Weekly GitHub Reports
@@ -120,10 +120,10 @@ cp github_config_example.yaml github_config.yaml
 #### 📆 Quarterly Jira Reports
 ```bash
 # Generate report for current quarter
-./run_quarterly_summary.sh
+./run_jira_quarterly_summary.sh
 
 # Generate report for specific quarter
-./run_quarterly_summary.sh 2025 4
+./run_jira_quarterly_summary.sh 2025 4
 ```
 
 #### 🐙 GitHub Quarterly Reports
@@ -140,14 +140,14 @@ cp github_config_example.yaml github_config.yaml
 ```
 team-reports/
 ├── 📊 Core Report Generators
-│   ├── weekly_team_summary.py           # Weekly Jira reports  
+│   ├── jira_weekly_summary.py           # Weekly Jira reports  
 │   ├── github_weekly_summary.py         # Weekly GitHub reports
-│   ├── quarterly_team_summary.py        # Quarterly Jira reports
+│   ├── jira_quarterly_summary.py        # Quarterly Jira reports
 │   └── github_quarterly_summary.py      # GitHub quarterly reports
 ├── 🚀 Execution Scripts  
-│   ├── run_weekly_summary.sh            # Weekly Jira report runner
+│   ├── run_jira_weekly_summary.sh       # Weekly Jira report runner
 │   ├── run_github_weekly_summary.sh     # Weekly GitHub report runner
-│   ├── run_quarterly_summary.sh         # Quarterly Jira report runner
+│   ├── run_jira_quarterly_summary.sh    # Quarterly Jira report runner
 │   └── run_github_quarterly_summary.sh  # GitHub quarterly report runner
 ├── ⚙️ Configuration
 │   ├── env.template                     # Environment template
@@ -172,9 +172,9 @@ team-reports/
 │   └── DEVELOPER_GUIDE.md            # Development guide
 ├── 📁 Output
 │   └── Reports/                       # Generated reports (auto-created)
-│       ├── team_summary_*.md          # Weekly Jira reports
+│       ├── jira_weekly_summary_*.md   # Weekly Jira reports
 │       ├── github_weekly_summary_*.md # Weekly GitHub reports
-│       ├── quarterly_summary_*.md     # Quarterly Jira reports
+│       ├── jira_quarterly_summary_*.md # Quarterly Jira reports
 │       └── github_quarterly_*.md      # GitHub quarterly reports
 ├── 🔧 Dependencies
 │   ├── requirements.txt               # Python package dependencies
@@ -222,25 +222,25 @@ pyyaml>=6.0.3         # YAML configuration parsing
 **Shell Script (Recommended):**
 ```bash
 # Generate report for last 7 days
-./run_weekly_summary.sh
+./run_jira_weekly_summary.sh
 
 # Generate report for specific date range  
-./run_weekly_summary.sh 2025-09-10 2025-09-16
+./run_jira_weekly_summary.sh 2025-09-10 2025-09-16
 
 # Generate report for current week
-./run_weekly_summary.sh $(date -d "monday" +%Y-%m-%d) $(date -d "sunday" +%Y-%m-%d)
+./run_jira_weekly_summary.sh $(date -d "monday" +%Y-%m-%d) $(date -d "sunday" +%Y-%m-%d)
 ```
 
 **Python Direct:**
 ```bash
 # Basic usage
-python3 weekly_team_summary.py
+python3 jira_weekly_summary.py
 
 # Specific date range
-python3 weekly_team_summary.py 2025-09-10 2025-09-16
+python3 jira_weekly_summary.py 2025-09-10 2025-09-16
 
 # Custom configuration
-python3 weekly_team_summary.py 2025-09-10 2025-09-16 custom_team_config.yaml
+python3 jira_weekly_summary.py 2025-09-10 2025-09-16 custom_team_config.yaml
 ```
 
 ### 🐙 Weekly GitHub Reports
@@ -274,25 +274,25 @@ python3 github_weekly_summary.py 2025-09-10 2025-09-16 custom_config.yaml
 **Shell Script (Recommended):**
 ```bash
 # Current quarter
-./run_quarterly_summary.sh
+./run_jira_quarterly_summary.sh
 
 # Specific quarter (Q4 2025)
-./run_quarterly_summary.sh 2025 4
+./run_jira_quarterly_summary.sh 2025 4
 
 # Custom configuration  
-./run_quarterly_summary.sh 2025 4 custom_team_config.yaml
+./run_jira_quarterly_summary.sh 2025 4 custom_team_config.yaml
 ```
 
 **Python Direct:**
 ```bash
 # Current quarter
-python3 quarterly_team_summary.py
+python3 jira_quarterly_summary.py
 
 # Specific quarter
-python3 quarterly_team_summary.py 2025 4
+python3 jira_quarterly_summary.py 2025 4
 
 # With custom config
-python3 quarterly_team_summary.py 2025 4 custom_config.yaml
+python3 jira_quarterly_summary.py 2025 4 custom_config.yaml
 ```
 
 ### 🐙 GitHub Quarterly Reports
@@ -326,15 +326,15 @@ python3 github_quarterly_summary.py 2025 4 custom_config.yaml
 **Generate all reports for current period:**
 ```bash
 # All weekly reports (Jira + GitHub)
-./run_weekly_summary.sh
+./run_jira_weekly_summary.sh
 ./run_github_weekly_summary.sh
 
 # All quarterly reports (Jira + GitHub)
-./run_quarterly_summary.sh  
+./run_jira_quarterly_summary.sh  
 ./run_github_quarterly_summary.sh
 
 # Complete reporting suite
-./run_weekly_summary.sh && ./run_github_weekly_summary.sh && ./run_quarterly_summary.sh && ./run_github_quarterly_summary.sh
+./run_jira_weekly_summary.sh && ./run_github_weekly_summary.sh && ./run_jira_quarterly_summary.sh && ./run_github_quarterly_summary.sh
 ```
 
 ## 📊 Report Output
@@ -461,9 +461,9 @@ All reports are generated in clean Markdown format with rich formatting, tables,
 ### 📁 Output Organization
 
 All reports are saved in the `Reports/` directory with consistent naming:
-- **Weekly Jira**: `team_summary_2025-09-10_to_2025-09-16.md`
+- **Weekly Jira**: `jira_weekly_summary_2025-09-10_to_2025-09-16.md`
 - **Weekly GitHub**: `github_weekly_summary_2025-09-10_to_2025-09-16.md`
-- **Quarterly Jira**: `quarterly_summary_Q4_2025.md`  
+- **Quarterly Jira**: `jira_quarterly_summary_Q4_2025.md`  
 - **GitHub Quarterly**: `github_quarterly_summary_Q4_2025.md`
 
 ## ⚙️ Configuration
@@ -703,7 +703,7 @@ run_*.sh               # Execution scripts
 1. **Missing Environment Variables**
    - Ensure `.env` file exists with correct Jira credentials
    - Check that `JIRA_SERVER`, `JIRA_EMAIL`, and `JIRA_API_TOKEN` are set
-   - Verify the `.env` file is in the same directory as `weekly_team_summary.py`
+   - Verify the `.env` file is in the same directory as `jira_weekly_summary.py`
 
 2. **Authentication Error**
    - Check your API token is correct
@@ -723,13 +723,13 @@ run_*.sh               # Execution scripts
    - Ensure all required fields are present
 
 5. **Import Errors**
-   - Ensure `server.py` is in the same directory as `weekly_team_summary.py`
+   - Ensure all scripts are in the same directory for proper imports
    - Check that all dependencies are installed: `pip install -r requirements.txt`
    - Verify Python version is 3.8 or higher
 
 ### Debug Mode
 
-Enable debug logging by modifying the logging level in `weekly_team_summary.py`:
+Enable debug logging by modifying the logging level in `jira_weekly_summary.py`:
 
 ```python
 logging.basicConfig(level=logging.DEBUG)
@@ -813,7 +813,7 @@ Your comprehensive Team Reports suite is now ready to use! You can:
 **Start generating reports and transform your team's development data into actionable insights!** 🚀
 
 Choose your report type:
-- `./run_weekly_summary.sh` for Jira sprint insights
+- `./run_jira_weekly_summary.sh` for Jira sprint insights
 - `./run_github_weekly_summary.sh` for GitHub sprint insights
-- `./run_quarterly_summary.sh` for Jira performance analysis  
+- `./run_jira_quarterly_summary.sh` for Jira performance analysis  
 - `./run_github_quarterly_summary.sh` for GitHub contribution tracking

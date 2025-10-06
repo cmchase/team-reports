@@ -6,10 +6,10 @@ Generates quarterly summaries focused on individual contributor performance,
 tracking ticket completion counts and productivity metrics per team member.
 
 Usage:
-    python3 quarterly_team_summary.py [year] [quarter] [config_file]
-    python3 quarterly_team_summary.py 2025 4
-    python3 quarterly_team_summary.py  # Uses current quarter
-    python3 quarterly_team_summary.py 2025 4 custom_team_config.yaml
+    python3 jira_quarterly_summary.py [year] [quarter] [config_file]
+    python3 jira_quarterly_summary.py 2025 4
+    python3 jira_quarterly_summary.py  # Uses current quarter
+    python3 jira_quarterly_summary.py 2025 4 custom_team_config.yaml
 """
 
 import sys
@@ -413,9 +413,9 @@ def main():
         report = summary_generator.generate_quarterly_summary(year, quarter)
         
         # Save the report to file system
-        filename = generate_filename(f'quarterly_summary_Q{quarter}', f'{year}-01-01', f'{year}-12-31')
+        filename = generate_filename(f'jira_quarterly_summary_Q{quarter}', f'{year}-01-01', f'{year}-12-31')
         # Create more descriptive filename for quarterly reports
-        quarter_filename = f"quarterly_summary_Q{quarter}_{year}.md"
+        quarter_filename = f"jira_quarterly_summary_Q{quarter}_{year}.md"
         filepath = save_report(report, quarter_filename)
         
         # Display the report to console and show completion message

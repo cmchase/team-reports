@@ -5,7 +5,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SUMMARY_SCRIPT="$SCRIPT_DIR/weekly_team_summary.py"
+SUMMARY_SCRIPT="$SCRIPT_DIR/jira_weekly_summary.py"
 
 # Colors for output
 RED='\033[0;31m'
