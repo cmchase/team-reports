@@ -361,7 +361,12 @@ def create_summary_report(title: str, start_date: str, end_date: str,
             all_tickets.extend(category_tickets)
         
         # Sort by updated date (most recent first) for better readability
-        all_tickets.sort(key=lambda ticket: getattr(ticket.fields, 'updated', ''), reverse=True)
+        # Handle different ticket object structures safely
+        try:
+            all_tickets.sort(key=lambda ticket: getattr(getattr(ticket, 'fields', ticket), 'updated', ''), reverse=True)
+        except (AttributeError, TypeError):
+            # Fallback: leave tickets in original order if sorting fails
+            pass
         
         report.extend(generate_category_section("All Tickets", "Complete ticket overview for the period", all_tickets, format_func))
     
