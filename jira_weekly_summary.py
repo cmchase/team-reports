@@ -122,6 +122,100 @@ class WeeklyTeamSummary:
         return self.generate_summary_report(categorized_tickets, start_date, end_date)
         
 
+def generate_wip_analysis(config: Dict[str, Any]) -> str:
+    """
+    Generate WIP (Work in Progress) analysis section for weekly report.
+    
+    Shows current WIP per engineer and team total, with over-limit highlights.
+    
+    Args:
+        config: Configuration dictionary with Jira settings and thresholds
+        
+    Returns:
+        str: Markdown section with WIP analysis
+    """
+    try:
+        # Initialize Jira client
+        jira_client = initialize_jira_client()
+        
+        # Get active states from config
+        active_states = config.get('states', {}).get('active', ['In Progress', 'Review'])
+        
+        # Get WIP threshold per engineer
+        wip_threshold = config.get('thresholds', {}).get('wip', {}).get('max_per_engineer', 3)
+        
+        # Build JQL for current active tickets
+        base_jql = config.get('base_jql', '')
+        
+        # Create JQL to find all currently active tickets
+        active_states_jql = ','.join([f'"{state}"' for state in active_states])
+        if base_jql:
+            jql = f"({base_jql}) AND status in ({active_states_jql})"
+        else:
+            jql = f"status in ({active_states_jql})"
+            
+        # Fetch current active tickets
+        max_results = config.get('report_settings', {}).get('max_results', 200)  
+        
+        print(f"🔍 Fetching current WIP tickets with JQL: {jql}")
+        tickets = jira_client.search_issues(jql, maxResults=max_results, expand='changelog')
+        
+        if not tickets:
+            return f"\n\n### 📊 Flow • Work in Progress (WIP)\n\n*No active tickets found in states: {', '.join(active_states)}*\n"
+        
+        # Count WIP by engineer
+        wip_by_engineer = {}
+        unassigned_count = 0
+        
+        for ticket in tickets:
+            assignee = getattr(ticket.fields.assignee, 'displayName', None) if ticket.fields.assignee else None
+            
+            if assignee:
+                wip_by_engineer[assignee] = wip_by_engineer.get(assignee, 0) + 1
+            else:
+                unassigned_count += 1
+        
+        # Build report section
+        total_wip = sum(wip_by_engineer.values()) + unassigned_count
+        section = f"\n\n### 📊 Flow • Work in Progress (WIP)\n\n"
+        section += f"**Current WIP:** {total_wip} tickets • **Threshold:** {wip_threshold} per engineer\n\n"
+        
+        if wip_by_engineer or unassigned_count > 0:
+            # WIP table
+            section += "#### 👥 WIP by Engineer\n\n"
+            section += "| Engineer | WIP Count | Over Limit? |\n"
+            section += "|----------|-----------|-------------|\n"
+            
+            over_limit_engineers = []
+            
+            # Sort engineers by WIP count (highest first)
+            for engineer, count in sorted(wip_by_engineer.items(), key=lambda x: x[1], reverse=True):
+                over_limit = count > wip_threshold
+                over_limit_text = "🔴 Yes" if over_limit else "✅ No"
+                section += f"| {engineer} | {count} | {over_limit_text} |\n"
+                
+                if over_limit:
+                    over_limit_engineers.append(f"{engineer} ({count} tickets)")
+            
+            # Add unassigned if any
+            if unassigned_count > 0:
+                section += f"| *Unassigned* | {unassigned_count} | - |\n"
+            
+            section += "\n"
+            
+            # Over-limit highlights
+            if over_limit_engineers:
+                section += "#### 🚨 Over WIP Limit\n\n"
+                for engineer_info in over_limit_engineers:
+                    section += f"- **{engineer_info}** exceeds threshold of {wip_threshold}\n"
+                section += "\n"
+            
+        return section
+        
+    except Exception as e:
+        return f"\n\n### 📊 Flow • Work in Progress (WIP)\n\n*Error computing WIP analysis: {e}*\n"
+
+
 def generate_cycle_time_analysis(config: Dict[str, Any], start_date: str, end_date: str) -> str:
     """
     Generate cycle time analysis section for weekly report.
@@ -261,11 +355,19 @@ def main():
         summary_generator = WeeklyTeamSummary(config_file)
         report = summary_generator.generate_weekly_summary(start_date, end_date)
         
+        # Add cycle time analysis if enabled
+        if enable_cycle_time:
+            print("🔄 Computing weekly cycle time analysis...")
+            cycle_time_section = generate_cycle_time_analysis(config, start_date, end_date)
+            report += cycle_time_section
+        
+        # Add WIP analysis if enabled
+        if enable_wip:
+            print("📊 Computing current WIP analysis...")
+            wip_section = generate_wip_analysis(config)
+            report += wip_section
+        
         # TODO: Future metrics sections (Phase 2+)
-        # if enable_cycle_time:
-        #     report += generate_cycle_time_analysis(tickets, start_date, end_date)
-        # if enable_wip:
-        #     report += generate_wip_analysis(tickets, start_date, end_date)  
         # if enable_blocked_time:
         #     report += generate_blocked_time_analysis(tickets, start_date, end_date)
         

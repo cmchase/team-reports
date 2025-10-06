@@ -15,10 +15,13 @@ github:
 metrics: {}
 
 # Configurable thresholds for analytics
-thresholds: {}
+thresholds:
+  wip:
+    max_per_engineer: 3  # Default WIP limit per engineer
 
-# State mappings for different systems
-states: {}
+# State mappings for different systems  
+states:
+  active: ["In Progress", "Review"]  # States considered as active WIP
 
 # Bot accounts to filter out from reports
 bots: []
