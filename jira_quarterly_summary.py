@@ -432,9 +432,13 @@ def main():
         # Generate the complete quarterly report
         report = summary_generator.generate_quarterly_summary(year, quarter)
         
+        # Add quarterly cycle time analysis if enabled
+        if enable_cycle_time:
+            print("🔄 Computing quarterly cycle time trends...")
+            cycle_time_section = generate_quarterly_cycle_time_analysis(config, year, quarter)
+            report += cycle_time_section
+        
         # TODO: Future quarterly metrics sections (Phase 2+)
-        # if enable_cycle_time:
-        #     report += generate_quarterly_cycle_time_trends(tickets, year, quarter)
         # if enable_wip:
         #     report += generate_quarterly_wip_analysis(tickets, year, quarter)
         # if enable_blocked_time:
@@ -460,6 +464,89 @@ def main():
         import traceback
         traceback.print_exc()  # Show full stack trace for debugging
         sys.exit(1)
+
+
+def generate_quarterly_cycle_time_analysis(config: Dict[str, Any], year: int, quarter: int) -> str:
+    """
+    Generate quarterly cycle time analysis with trends.
+    
+    Args:
+        config: Configuration dictionary with Jira settings
+        year: Year for the quarter
+        quarter: Quarter number (1-4)
+        
+    Returns:
+        str: Markdown section with quarterly cycle time analysis
+    """
+    try:
+        # Initialize Jira client
+        jira_client = initialize_jira_client()
+        
+        # Get quarter date range
+        from utils.date import get_quarter_range
+        start_date, end_date = get_quarter_range(year, quarter)
+        
+        # Build JQL for all tickets in the quarter
+        from utils.jira import build_jql_with_dates
+        base_jql = config.get('base_jql', '')
+        jql = build_jql_with_dates(base_jql, start_date, end_date, config, 'all')
+        
+        # Fetch tickets with changelog for cycle time calculation
+        max_results = config.get('report_settings', {}).get('max_results', 200)
+        tickets = fetch_tickets_with_changelog(jira_client, jql, max_results)
+        
+        if not tickets:
+            return f"\n\n### ⏱️ Flow • Quarterly Cycle Time Trends\n\n*No tickets found for Q{quarter} {year} cycle time analysis.*\n"
+        
+        # Get states configuration
+        states_done = config.get('status_filters', {}).get('completed', ['Closed', 'Done'])
+        state_in_progress = config.get('states', {}).get('in_progress', 'In Progress')
+        
+        # Compute cycle times for all tickets in quarter
+        cycle_times = []
+        for ticket in tickets:
+            cycle_time = compute_cycle_time_days(ticket, states_done, state_in_progress)
+            if cycle_time is not None:
+                cycle_times.append(cycle_time)
+        
+        if not cycle_times:
+            return f"\n\n### ⏱️ Flow • Quarterly Cycle Time Trends\n\n*No completed tickets with full cycle time data found for Q{quarter} {year}.*\n"
+        
+        # Compute overall statistics
+        stats = compute_cycle_time_stats(cycle_times)
+        
+        # Build report section
+        section = f"\n\n### ⏱️ Flow • Quarterly Cycle Time Trends\n\n"
+        section += f"**Q{quarter} {year} Summary:** {len(cycle_times)} tickets completed • "
+        section += f"**Average: {stats['avg']} days** • "
+        section += f"**Median: {stats['median']} days** • "
+        section += f"**P90: {stats['p90']} days**\n\n"
+        
+        # Add trend note based on sample size
+        if len(cycle_times) < 10:
+            section += f"*⚠️ Small sample size ({len(cycle_times)} tickets) - trends may not be statistically significant.*\n\n"
+        elif len(cycle_times) < 20:
+            section += f"*ℹ️ Moderate sample size ({len(cycle_times)} tickets) - consider trends cautiously.*\n\n"
+        else:
+            section += f"*✅ Good sample size ({len(cycle_times)} tickets) for trend analysis.*\n\n"
+        
+        # Simple distribution analysis
+        fast_tickets = [t for t in cycle_times if t <= stats['median']]
+        slow_tickets = [t for t in cycle_times if t > stats['median']]
+        
+        section += "#### 📊 Distribution\n\n"
+        section += f"- **Faster than median** ({stats['median']} days): {len(fast_tickets)} tickets ({len(fast_tickets)/len(cycle_times)*100:.0f}%)\n"
+        section += f"- **Slower than median**: {len(slow_tickets)} tickets ({len(slow_tickets)/len(cycle_times)*100:.0f}%)\n"
+        
+        # Simple outlier analysis
+        outliers = [t for t in cycle_times if t > stats['p90']]
+        if outliers:
+            section += f"- **Outliers** (>P90): {len(outliers)} tickets with cycle times: {', '.join([f'{t:.1f}d' for t in sorted(outliers)])}\n"
+        
+        return section
+        
+    except Exception as e:
+        return f"\n\n### ⏱️ Flow • Quarterly Cycle Time Trends\n\n*Error computing quarterly cycle time: {e}*\n"
 
 
 # Script entry point - only run if this file is executed directly

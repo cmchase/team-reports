@@ -8,6 +8,7 @@ building JQL queries, and fetching tickets with various filters.
 
 import os
 from typing import List, Dict, Any, Optional
+from datetime import datetime
 from jira import JIRA
 
 
@@ -184,3 +185,150 @@ def validate_jira_connection(jira_client: JIRA) -> bool:
         return True
     except Exception:
         return False
+
+
+def compute_cycle_time_days(issue: Any, states_done: List[str], 
+                           state_in_progress: str = "In Progress") -> Optional[float]:
+    """
+    Compute cycle time in days for a JIRA issue.
+    
+    Cycle time is measured from the first transition into 'In Progress' 
+    to the first time the issue reaches any 'Done' state.
+    
+    Args:
+        issue: JIRA issue object with changelog/history
+        states_done: List of status names considered "done" (e.g., ["Closed", "Done"])
+        state_in_progress: Status name for "in progress" (default: "In Progress")
+        
+    Returns:
+        Optional[float]: Cycle time in days, or None if transitions are missing
+        
+    Examples:
+        cycle_time = compute_cycle_time_days(issue, ["Closed", "Done"], "In Progress")
+        # Returns 3.5 for an issue that took 3.5 days from In Progress to Done
+        
+        cycle_time = compute_cycle_time_days(issue, ["Closed"])  
+        # Returns None if issue never reached In Progress or Done states
+    """
+    try:
+        # Get changelog from issue (expand='changelog' needed when fetching)
+        if not hasattr(issue, 'changelog') or not issue.changelog:
+            # Try to get it from the issue object directly
+            changelog = getattr(issue, 'changelog', None)
+            if not changelog:
+                return None
+        else:
+            changelog = issue.changelog
+            
+        # Find first transition to In Progress and first transition to Done
+        first_in_progress = None
+        first_done = None
+        
+        # Sort histories by created date
+        histories = sorted(changelog.histories, key=lambda h: h.created)
+        
+        for history in histories:
+            for item in history.items:
+                if item.field == 'status':
+                    created_time = datetime.strptime(history.created[:19], '%Y-%m-%dT%H:%M:%S')
+                    
+                    # Check for first transition TO In Progress
+                    if item.toString == state_in_progress and first_in_progress is None:
+                        first_in_progress = created_time
+                    
+                    # Check for first transition TO any Done state
+                    if item.toString in states_done and first_done is None:
+                        first_done = created_time
+                        
+                    # If we have both, we can stop looking
+                    if first_in_progress and first_done:
+                        break
+                        
+            if first_in_progress and first_done:
+                break
+        
+        # Calculate cycle time if we have both transitions
+        if first_in_progress and first_done and first_done > first_in_progress:
+            delta = first_done - first_in_progress
+            return delta.total_seconds() / (24 * 3600)  # Convert to days
+        
+        return None
+        
+    except Exception as e:
+        # Return None for any parsing errors
+        return None
+
+
+def fetch_tickets_with_changelog(jira_client: JIRA, jql: str, max_results: int = 200) -> List[Any]:
+    """
+    Fetch tickets from JIRA with changelog data for cycle time analysis.
+    
+    Args:
+        jira_client: Authenticated JIRA client instance
+        jql: JQL query string
+        max_results: Maximum number of results to return (default: 200)
+        
+    Returns:
+        List[Any]: List of JIRA issue objects with changelog data
+        
+    Note:
+        This function expands the changelog field to get status transition history
+        needed for cycle time calculations.
+    """
+    print(f"🔍 Executing JQL query with changelog...")
+    print(f"📝 JQL: {jql}")
+    
+    try:
+        issues = jira_client.search_issues(
+            jql, 
+            maxResults=max_results,
+            expand='changelog'  # This is key for getting status history
+        )
+        print(f"📊 Found {len(issues)} tickets with changelog data")
+        return issues
+    except Exception as e:
+        print(f"❌ Error fetching tickets with changelog: {e}")
+        return []
+
+
+def compute_cycle_time_stats(cycle_times: List[float]) -> Dict[str, float]:
+    """
+    Compute cycle time statistics (average, median, p90) from a list of cycle times.
+    
+    Args:
+        cycle_times: List of cycle times in days
+        
+    Returns:
+        Dict[str, float]: Statistics with keys 'avg', 'median', 'p90'
+        
+    Example:
+        stats = compute_cycle_time_stats([1.0, 2.5, 3.0, 4.0, 10.0])
+        # Returns {'avg': 4.1, 'median': 3.0, 'p90': 8.2}
+    """
+    if not cycle_times:
+        return {'avg': 0.0, 'median': 0.0, 'p90': 0.0}
+    
+    sorted_times = sorted(cycle_times)
+    n = len(sorted_times)
+    
+    # Average
+    avg = sum(sorted_times) / n
+    
+    # Median
+    if n % 2 == 0:
+        median = (sorted_times[n//2 - 1] + sorted_times[n//2]) / 2
+    else:
+        median = sorted_times[n//2]
+    
+    # P90 (90th percentile)
+    p90_index = int(0.9 * n) - 1
+    if p90_index >= 0:
+        p90 = sorted_times[p90_index]
+    else:
+        p90 = sorted_times[-1]
+    
+    return {
+        'avg': round(avg, 1),
+        'median': round(median, 1), 
+        'p90': round(p90, 1)
+    }
