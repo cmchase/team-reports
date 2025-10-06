@@ -38,10 +38,11 @@ def categorize_ticket(issue, team_categories: Dict[str, Dict[str, Any]]) -> str:
         }
         category = categorize_ticket(jira_issue, team_categories)
     """
-    # Get ticket details
-    components = [comp.name for comp in getattr(issue.fields, 'components', [])]
+    # Get ticket details with None handling
+    components_field = getattr(issue.fields, 'components', [])
+    components = [comp.name for comp in (components_field or [])]
     project = issue.fields.project.key
-    summary = issue.fields.summary.lower()
+    summary = (issue.fields.summary or "").lower()
     description = (issue.fields.description or "").lower()
     
     # Check each category
@@ -125,7 +126,8 @@ def get_ticket_components(issue) -> List[str]:
     Returns:
         List of component names
     """
-    return [comp.name for comp in getattr(issue.fields, 'components', [])]
+    components_field = getattr(issue.fields, 'components', [])
+    return [comp.name for comp in (components_field or [])]
 
 
 def get_ticket_text_content(issue) -> str:
@@ -138,6 +140,6 @@ def get_ticket_text_content(issue) -> str:
     Returns:
         Combined summary and description text in lowercase
     """
-    summary = issue.fields.summary.lower()
+    summary = (issue.fields.summary or "").lower()
     description = (issue.fields.description or "").lower()
-    return f"{summary} {description}"
+    return f"{summary} {description}".strip()
