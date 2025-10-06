@@ -26,8 +26,8 @@ sys.path.insert(0, '.')
 
 from dotenv import load_dotenv
 from utils.date import get_current_quarter, get_quarter_range, parse_quarter_from_date
-from utils.config import load_config
-from utils.report import ensure_reports_directory, save_report, generate_filename
+from utils.config import load_config, get_config
+from utils.report import ensure_reports_directory, save_report, generate_filename, render_active_config
 
 # Load environment variables
 load_dotenv()
@@ -502,12 +502,17 @@ def main():
         # Generate the complete quarterly report
         report = summary_generator.generate_quarterly_summary(year, quarter)
         
+        # Append active configuration block
+        config = get_config([config_file])
+        config_block = render_active_config(config)
+        full_report = report + config_block
+        
         # Save the report
         quarter_filename = f"github_quarterly_summary_Q{quarter}_{year}.md"
-        filepath = save_report(report, quarter_filename)
+        filepath = save_report(full_report, quarter_filename)
         
         # Display the report and completion message
-        print("\n" + report)
+        print("\n" + full_report)
         print(f"\n📊 GitHub quarterly summary complete! Saved to: {filepath}")
         
     except Exception as e:

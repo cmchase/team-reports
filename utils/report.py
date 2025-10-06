@@ -7,6 +7,8 @@ managing output files, and generating consistent report structures.
 """
 
 import os
+import hashlib
+import yaml
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 from collections import defaultdict
@@ -353,3 +355,136 @@ def format_duration(start_date: str, end_date: str) -> str:
     else:
         # Different years
         return f"{start_dt.strftime('%B %d, %Y')} - {end_dt.strftime('%B %d, %Y')}"
+
+
+def redact_secrets(config: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Create a redacted copy of configuration with secrets replaced.
+    
+    Args:
+        config: Configuration dictionary that may contain secrets
+        
+    Returns:
+        Dict[str, Any]: Configuration with secrets redacted as "****"
+        
+    Secrets include:
+        - Any key containing 'token', 'password', 'secret', 'key'
+        - Environment variables under 'env' namespace
+        - Values that look like tokens (long alphanumeric strings)
+        
+    Example:
+        redacted = redact_secrets({'github_token': 'abc123', 'user': 'john'})
+        # Returns {'github_token': '****', 'user': 'john'}
+    """
+    import copy
+    
+    redacted = copy.deepcopy(config)
+    
+    def _redact_recursive(obj: Any, path: str = '') -> Any:
+        if isinstance(obj, dict):
+            result = {}
+            for key, value in obj.items():
+                current_path = f"{path}.{key}" if path else key
+                
+                # Check if key indicates a secret
+                secret_indicators = ['token', 'password', 'secret', 'key', 'credential']
+                is_secret = any(indicator in key.lower() for indicator in secret_indicators)
+                
+                # Special handling for env namespace (all values are secrets)
+                if current_path.startswith('env.') and key != 'env':
+                    is_secret = True
+                
+                if is_secret and isinstance(value, str) and value:
+                    result[key] = '****'
+                else:
+                    result[key] = _redact_recursive(value, current_path)
+            return result
+        elif isinstance(obj, list):
+            return [_redact_recursive(item, f"{path}[{i}]") for i, item in enumerate(obj)]
+        elif isinstance(obj, str) and len(obj) > 20 and obj.replace('-', '').replace('_', '').isalnum():
+            # Redact long alphanumeric strings that might be tokens
+            return '****'
+        else:
+            return obj
+    
+    return _redact_recursive(redacted)
+
+
+def generate_config_hash(config: Dict[str, Any]) -> str:
+    """
+    Generate a stable hash of the configuration for change detection.
+    
+    Args:
+        config: Configuration dictionary (should be redacted first)
+        
+    Returns:
+        str: Short SHA256 hash (first 8 characters)
+        
+    The hash is computed over a sorted YAML representation to ensure
+    deterministic results regardless of dict ordering.
+    
+    Example:
+        hash_str = generate_config_hash(redacted_config)
+        # Returns something like "a1b2c3d4"
+    """
+    # Convert to sorted YAML for deterministic hashing
+    yaml_str = yaml.dump(config, default_flow_style=False, sort_keys=True)
+    
+    # Generate SHA256 and return first 8 characters
+    hash_obj = hashlib.sha256(yaml_str.encode('utf-8'))
+    return hash_obj.hexdigest()[:8]
+
+
+def render_active_config(config: Dict[str, Any]) -> str:
+    """
+    Render active configuration as a collapsible Markdown block.
+    
+    Args:
+        config: Complete configuration dictionary
+        
+    Returns:
+        str: Markdown with collapsible configuration details
+        
+    The rendered block includes:
+        - Collapsible HTML details/summary structure
+        - Redacted configuration in YAML format
+        - Stable hash for change detection
+        - Professional formatting
+        
+    Example:
+        config_md = render_active_config(config)
+        # Returns collapsible block with redacted config
+    """
+    # Only render if the flag is enabled
+    if not config.get('report', {}).get('show_active_config', False):
+        return ""
+    
+    # Create redacted version for display
+    redacted_config = redact_secrets(config)
+    
+    # Generate stable hash
+    config_hash = generate_config_hash(redacted_config)
+    
+    # Convert to pretty YAML
+    yaml_output = yaml.dump(redacted_config, default_flow_style=False, sort_keys=True, indent=2)
+    
+    # Create collapsible Markdown block
+    markdown = f"""
+---
+
+<details>
+<summary>📋 Active Configuration</summary>
+
+```yaml
+# Configuration Hash: {config_hash}
+# Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
+# Note: Sensitive values have been redacted
+
+{yaml_output}```
+
+*This configuration snapshot helps track changes and validate report settings. Tokens and secrets are automatically redacted for security.*
+
+</details>
+"""
+    
+    return markdown

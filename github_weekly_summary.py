@@ -26,8 +26,8 @@ sys.path.insert(0, '.')
 
 from dotenv import load_dotenv
 from utils.date import parse_date_args, get_current_week
-from utils.config import load_config
-from utils.report import ensure_reports_directory, save_report, generate_filename
+from utils.config import load_config, get_config
+from utils.report import ensure_reports_directory, save_report, generate_filename, render_active_config
 
 # Load environment variables
 load_dotenv()
@@ -495,10 +495,15 @@ def main():
         # Generate the report
         report_content = summary_generator.generate_report(start_date, end_date, config_file)
         
+        # Append active configuration block
+        config = get_config([config_file])
+        config_block = render_active_config(config)
+        full_report = report_content + config_block
+        
         # Save the report
         ensure_reports_directory()
         filename = generate_filename("github_weekly_summary", start_date, end_date)
-        filepath = save_report(report_content, filename)
+        filepath = save_report(full_report, filename)
         
         print(f"\n✅ GitHub Weekly Summary Report Generated!")
         print(f"📄 Report saved to: {filepath}")

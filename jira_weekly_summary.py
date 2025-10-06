@@ -30,8 +30,8 @@ from jira import JIRA
 from utils.ticket import categorize_ticket, format_ticket_info
 from utils.jira import initialize_jira_client, fetch_tickets_for_date_range
 from utils.date import parse_date_args as parse_date_args_util
-from utils.config import load_config
-from utils.report import create_summary_report, save_report, generate_filename
+from utils.config import load_config, get_config
+from utils.report import create_summary_report, save_report, generate_filename, render_active_config
 
 # Load environment variables
 load_dotenv()
@@ -124,11 +124,16 @@ def main():
         summary_generator = WeeklyTeamSummary(config_file)
         report = summary_generator.generate_weekly_summary(start_date, end_date)
         
+        # Append active configuration block
+        config = get_config([config_file])
+        config_block = render_active_config(config)
+        full_report = report + config_block
+        
         # Save report using utility functions
         filename = generate_filename('jira_weekly_summary', start_date, end_date)
-        filepath = save_report(report, filename)
+        filepath = save_report(full_report, filename)
         
-        print("\n" + report)
+        print("\n" + full_report)
         
     except Exception as e:
         print(f"❌ Error generating summary: {e}")

@@ -26,8 +26,8 @@ from jira import JIRA
 from utils.ticket import format_ticket_info
 from utils.jira import initialize_jira_client, fetch_tickets_for_date_range
 from utils.date import get_current_quarter, get_quarter_range, parse_quarter_from_date
-from utils.config import load_config
-from utils.report import generate_filename, save_report, ensure_reports_directory
+from utils.config import load_config, get_config
+from utils.report import generate_filename, save_report, ensure_reports_directory, render_active_config
 
 # Load environment variables
 load_dotenv()
@@ -412,14 +412,19 @@ def main():
         # Generate the complete quarterly report
         report = summary_generator.generate_quarterly_summary(year, quarter)
         
+        # Append active configuration block
+        config = get_config([config_file])
+        config_block = render_active_config(config)
+        full_report = report + config_block
+        
         # Save the report to file system
         filename = generate_filename(f'jira_quarterly_summary_Q{quarter}', f'{year}-01-01', f'{year}-12-31')
         # Create more descriptive filename for quarterly reports
         quarter_filename = f"jira_quarterly_summary_Q{quarter}_{year}.md"
-        filepath = save_report(report, quarter_filename)
+        filepath = save_report(full_report, quarter_filename)
         
         # Display the report to console and show completion message
-        print("\n" + report)
+        print("\n" + full_report)
         print(f"\n📊 Quarterly summary complete! Saved to: {filepath}")
         
     except Exception as e:
