@@ -7,13 +7,13 @@
 
 ### 1. ALWAYS Use Team Configuration First
 - **NEVER** use generic date-only JQL queries
-- **ALWAYS** read and use the `base_jql` from `jira_config.yaml`
+- **ALWAYS** read and use the `base_jql` from `config/jira_config.yaml`
 - **ALWAYS** combine team filter with date filter
 
 ### 2. Correct JQL Query Structure
 ```sql
 (
-    [base_jql from jira_config.yaml]
+    [base_jql from config/jira_config.yaml]
 ) AND updated >= "YYYY-MM-DD" AND updated <= "YYYY-MM-DD" AND status NOT IN ("New", "Refinement", "To Do") ORDER BY [order_by from config]
 ```
 
@@ -21,7 +21,7 @@
 
 #### Step 1: Read Team Configuration
 ```bash
-read_file jira_config.yaml
+read_file config/jira_config.yaml
 ```
 
 #### Step 2: Extract base_jql
@@ -73,7 +73,7 @@ issue = jira_client.issue(issue_key)
 
 ### 5. Configuration Requirements
 
-#### jira_config.yaml must have:
+#### config/jira_config.yaml must have:
 - Real project names (not "PROJ")
 - Real team member emails (not "manager@company.com")
 - Real components (not generic placeholders)
@@ -94,7 +94,7 @@ base_jql: |
 ### 6. Validation Checklist
 
 Before generating report:
-- [ ] Read jira_config.yaml
+- [ ] Read config/jira_config.yaml
 - [ ] Verify base_jql has real values (not placeholders)
 - [ ] Build complete JQL with team filter + date filter
 - [ ] Test JQL query returns reasonable results
@@ -123,7 +123,7 @@ A proper weekly report should:
 
 ```bash
 # 1. Read configuration
-read_file jira_config.yaml
+read_file config/jira_config.yaml
 
 # 2. Build and test JQL
 python3 weekly_team_summary.py 2024-09-16 2024-09-24

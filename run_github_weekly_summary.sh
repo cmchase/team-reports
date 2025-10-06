@@ -75,7 +75,7 @@ if [ ! -f ".env" ]; then
 fi
 
 # Check for GitHub configuration
-CONFIG_FILE="github_config.yaml"
+CONFIG_FILE="config/github_config.yaml"
 
 # Check if custom config file is provided as last argument
 if [ $# -gt 0 ] && [[ "${!#}" == *.yaml ]]; then
@@ -85,10 +85,10 @@ fi
 
 if [ ! -f "$CONFIG_FILE" ]; then
     echo -e "${RED}❌ Error: Configuration file '$CONFIG_FILE' not found${NC}"
-    if [ "$CONFIG_FILE" = "github_config.yaml" ]; then
+    if [ "$CONFIG_FILE" = "config/github_config.yaml" ]; then
         echo "Please create your GitHub configuration:"
-        echo -e "${CYAN}  cp github_config_example.yaml github_config.yaml${NC}"
-        echo "Then edit github_config.yaml with your repositories and team members"
+        echo -e "${CYAN}  cp config/github_config_example.yaml config/github_config.yaml${NC}"
+        echo "Then edit config/github_config.yaml with your repositories and team members"
     else
         echo "Please ensure the configuration file exists: $CONFIG_FILE"
     fi
@@ -136,7 +136,7 @@ fi
 if [ -n "$END_DATE" ]; then
     PYTHON_ARGS+=("$END_DATE")
 fi
-if [ "$CONFIG_FILE" != "github_config.yaml" ]; then
+if [ "$CONFIG_FILE" != "config/github_config.yaml" ]; then
     PYTHON_ARGS+=("$CONFIG_FILE")
 fi
 

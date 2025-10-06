@@ -27,7 +27,7 @@ def load_config(config_file: str) -> Dict[str, Any]:
         SystemExit: If file not found or YAML parsing fails
         
     Example:
-        config = load_config('jira_config.yaml')
+        config = load_config('config/jira_config.yaml')
         base_jql = config['base_jql']
     """
     try:
@@ -38,7 +38,7 @@ def load_config(config_file: str) -> Dict[str, Any]:
         
     except FileNotFoundError:
         print(f"❌ Configuration file {config_file} not found!")
-        print("Please create a jira_config.yaml file or specify a valid config file.")
+        print("Please create a config/jira_config.yaml file or specify a valid config file.")
         sys.exit(1)
         
     except yaml.YAMLError as e:
@@ -207,7 +207,7 @@ def save_config(config: Dict[str, Any], config_file: str) -> bool:
         bool: True if successful, False otherwise
         
     Example:
-        success = save_config(config, 'my_jira_config.yaml')
+        success = save_config(config, 'config/my_jira_config.yaml')
     """
     try:
         with open(config_file, 'w') as f:
@@ -231,7 +231,7 @@ def load_config_with_defaults(config_file: str) -> Dict[str, Any]:
         Dict[str, Any]: Configuration with defaults applied
         
     Example:
-        config = load_config_with_defaults('jira_config.yaml')
+        config = load_config_with_defaults('config/jira_config.yaml')
     """
     default_config = get_default_config()
     
@@ -503,11 +503,11 @@ def load_default_config() -> Dict[str, Any]:
 
 def load_user_configs(paths: Optional[List[str]] = None) -> Dict[str, Any]:
     """
-    Load user configuration files (jira_config.yaml, github_config.yaml).
+    Load user configuration files (config/jira_config.yaml, config/github_config.yaml).
     
     Args:
         paths: Optional list of config file paths. If None, auto-detect
-               jira_config.yaml and github_config.yaml in repo root.
+               config/jira_config.yaml and config/github_config.yaml in config/ directory.
     
     Returns:
         Dict[str, Any]: Merged user configuration dictionary
@@ -522,7 +522,7 @@ def load_user_configs(paths: Optional[List[str]] = None) -> Dict[str, Any]:
         paths = []
         
         for config_name in ['jira_config.yaml', 'github_config.yaml']:
-            config_path = repo_root / config_name
+            config_path = repo_root / 'config' / config_name
             if config_path.exists():
                 paths.append(str(config_path))
     
@@ -642,12 +642,12 @@ def get_config(paths: Optional[List[str]] = None) -> Dict[str, Any]:
     
     Precedence (later overrides earlier):
     1. Default config (config/default_config.yaml)
-    2. User YAML files (jira_config.yaml, github_config.yaml) 
+    2. User YAML files (config/jira_config.yaml, config/github_config.yaml) 
     3. Environment variable overrides
     
     Args:
         paths: Optional list of user config paths. If None, auto-detect
-               jira_config.yaml/github_config.yaml at repo root.
+               config/jira_config.yaml/config/github_config.yaml in config/ directory.
     
     Returns:
         Dict[str, Any]: Complete merged configuration

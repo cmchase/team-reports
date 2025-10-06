@@ -19,7 +19,7 @@ Generate comprehensive quarterly reports from GitHub repositories, tracking cont
      ```
 
 3. **Configure Repositories**:
-   - Copy `github_config_example.yaml` to `github_config.yaml`
+   - Copy `config/github_config_example.yaml` to `config/github_config.yaml`
    - Edit the configuration with your repositories and team members
 
 ### 2. Generate Reports
@@ -33,7 +33,7 @@ Generate comprehensive quarterly reports from GitHub repositories, tracking cont
 ./run_github_quarterly_summary.sh 2025 4
 
 # Use custom configuration
-./run_github_quarterly_summary.sh 2025 4 custom_github_config.yaml
+./run_github_quarterly_summary.sh 2025 4 custom_config/github_config.yaml
 ```
 
 #### Using Python Directly
@@ -45,7 +45,7 @@ python github_quarterly_summary.py
 python github_quarterly_summary.py 2025 4
 
 # Custom config
-python github_quarterly_summary.py 2025 4 custom_github_config.yaml
+python github_quarterly_summary.py 2025 4 custom_config/github_config.yaml
 ```
 
 ## 📊 What's Included
@@ -72,7 +72,7 @@ python github_quarterly_summary.py 2025 4 custom_github_config.yaml
 
 ## ⚙️ Configuration
 
-### Basic Configuration (`github_config.yaml`)
+### Basic Configuration (`config/github_config.yaml`)
 
 ```yaml
 # GitHub Organization (optional)

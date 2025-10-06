@@ -9,7 +9,7 @@ Usage:
     python3 github_quarterly_summary.py [year] [quarter] [config_file]
     python3 github_quarterly_summary.py 2025 4
     python3 github_quarterly_summary.py  # Uses current quarter
-    python3 github_quarterly_summary.py 2025 4 github_config.yaml
+    python3 github_quarterly_summary.py 2025 4 config/github_config.yaml
 """
 
 import sys
@@ -34,7 +34,7 @@ load_dotenv()
 
 
 class GitHubQuarterlySummary:
-    def __init__(self, config_file='github_config.yaml'):
+    def __init__(self, config_file='config/github_config.yaml'):
         """Initialize the GitHub quarterly summary generator with configuration."""
         # GitHub API client setup
         self.github_token = os.getenv('GITHUB_TOKEN')
@@ -491,7 +491,7 @@ def main():
         print("=" * 60)
         
         # Check for optional custom configuration file
-        config_file = 'github_config.yaml'
+        config_file = 'config/github_config.yaml'
         if len(sys.argv) >= 4 and sys.argv[3].endswith('.yaml'):
             config_file = sys.argv[3]
             print(f"📝 Using custom config file: {config_file}")

@@ -102,7 +102,7 @@ The tool now uses external YAML configuration files for maximum flexibility:
 
 1. **Copy the template**:
    ```bash
-   cp jira_config_example.yaml my_jira_config.yaml
+   cp config/jira_config_example.yaml config/my_jira_config.yaml
    ```
 
 2. **Edit for your team**:
@@ -112,7 +112,7 @@ The tool now uses external YAML configuration files for maximum flexibility:
 
 3. **Use your configuration**:
    ```bash
-   python3 weekly_team_summary.py 2025-07-15 2025-07-22 my_jira_config.yaml
+   python3 jira_weekly_summary.py 2025-07-15 2025-07-22 config/my_jira_config.yaml
    ```
 
 For detailed configuration instructions, see **[CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)**.

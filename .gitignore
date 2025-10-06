@@ -78,19 +78,19 @@ team_summary_*.md
 team_summary_*.txt
 
 # Personal team configuration files (contains sensitive team data)
-jira_config.yaml
-*_jira_config.yaml
-my_jira_config.yaml
-backend_team.yaml
-frontend_team.yaml
-security_team.yaml
-devops_team.yaml
-github_config.yaml
+config/jira_config.yaml
+config/*_jira_config.yaml
+config/my_jira_config.yaml
+config/backend_team.yaml
+config/frontend_team.yaml
+config/security_team.yaml
+config/devops_team.yaml
+config/github_config.yaml
 
 # Temporary and test configuration files
-temp_config.yaml
-test_config.yaml
-config.local
+config/temp_config.yaml
+config/test_config.yaml
+config/config.local
 
 # Promotion analysis reports (contains sensitive employee data)
 promotion_analysis_*.md

@@ -59,18 +59,18 @@ if ! grep -q "GITHUB_TOKEN" .env; then
 fi
 
 # Check for configuration file
-CONFIG_FILE="github_config.yaml"
+CONFIG_FILE="config/github_config.yaml"
 if [ ! -f "$CONFIG_FILE" ]; then
     if [ -f "github_config_example.yaml" ]; then
-        echo "⚠️  Warning: github_config.yaml not found"
-        echo "Creating github_config.yaml from example file..."
-        cp github_config_example.yaml github_config.yaml
-        echo "✅ Created github_config.yaml"
-        echo "Please edit github_config.yaml to configure your repositories and team members"
+        echo "⚠️  Warning: config/github_config.yaml not found"
+        echo "Creating config/github_config.yaml from example file..."
+        cp config/github_config_example.yaml config/github_config.yaml
+        echo "✅ Created config/github_config.yaml"
+        echo "Please edit config/github_config.yaml to configure your repositories and team members"
         echo ""
     else
         echo "❌ Error: No GitHub configuration file found"
-        echo "Please create github_config.yaml with your repository and team configuration"
+        echo "Please create config/github_config.yaml with your repository and team configuration"
         exit 1
     fi
 fi

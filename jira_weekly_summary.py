@@ -14,7 +14,7 @@ Usage:
 Examples:
     python3 jira_weekly_summary.py 2025-07-15 2025-07-22
     python3 jira_weekly_summary.py  # Uses current week
-    python3 jira_weekly_summary.py 2025-07-15 2025-07-22 custom_jira_config.yaml
+    python3 jira_weekly_summary.py 2025-07-15 2025-07-22 config/custom_jira_config.yaml
 """
 
 import sys
@@ -37,7 +37,7 @@ from utils.report import create_summary_report, save_report, generate_filename, 
 load_dotenv()
 
 class WeeklyTeamSummary:
-    def __init__(self, config_file='jira_config.yaml'):
+    def __init__(self, config_file='config/jira_config.yaml'):
         self.jira_client = None
         self.config = self._load_config(config_file)
         self.base_jql = self.config['base_jql']
@@ -215,7 +215,7 @@ def main():
     """Main function"""
     try:
         # Extract config file first, before date parsing
-        config_file = 'jira_config.yaml'
+        config_file = 'config/jira_config.yaml'
         date_args = []
         
         # Filter sys.argv to separate date args from config file

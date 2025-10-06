@@ -9,7 +9,7 @@ Usage:
     python3 jira_quarterly_summary.py [year] [quarter] [config_file]
     python3 jira_quarterly_summary.py 2025 4
     python3 jira_quarterly_summary.py  # Uses current quarter
-    python3 jira_quarterly_summary.py 2025 4 custom_jira_config.yaml
+    python3 jira_quarterly_summary.py 2025 4 config/custom_jira_config.yaml
 """
 
 import sys
@@ -34,7 +34,7 @@ load_dotenv()
 
 
 class QuarterlyTeamSummary:
-    def __init__(self, config_file='jira_config.yaml'):
+    def __init__(self, config_file='config/jira_config.yaml'):
         """Initialize the quarterly team summary generator with configuration."""
         # Initialize JIRA client as None - will be set up later in initialize()
         self.jira_client = None
@@ -401,7 +401,7 @@ def main():
         print("=" * 60)
         
         # Check for optional custom configuration file
-        config_file = 'jira_config.yaml'  # Default configuration file
+        config_file = 'config/jira_config.yaml'  # Default configuration file
         if len(sys.argv) >= 4 and sys.argv[3].endswith('.yaml'):
             config_file = sys.argv[3]
             print(f"📝 Using custom config file: {config_file}")

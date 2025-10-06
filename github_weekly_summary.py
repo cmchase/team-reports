@@ -9,7 +9,7 @@ Usage:
     python3 github_weekly_summary.py [start_date] [end_date] [config_file]
     python3 github_weekly_summary.py 2025-10-07 2025-10-13
     python3 github_weekly_summary.py  # Uses current week
-    python3 github_weekly_summary.py 2025-10-07 2025-10-13 custom_github_config.yaml
+    python3 github_weekly_summary.py 2025-10-07 2025-10-13 config/custom_github_config.yaml
 """
 
 import sys
@@ -34,7 +34,7 @@ load_dotenv()
 
 
 class GitHubWeeklySummary:
-    def __init__(self, config_file='github_config.yaml'):
+    def __init__(self, config_file='config/github_config.yaml'):
         """Initialize the GitHub weekly summary generator with configuration."""
         # GitHub API client setup
         self.github_token = os.getenv('GITHUB_TOKEN')
@@ -432,7 +432,7 @@ class GitHubWeeklySummary:
 
         return section
 
-    def generate_report(self, start_date: str, end_date: str, config_file: str = 'github_config.yaml') -> str:
+    def generate_report(self, start_date: str, end_date: str, config_file: str = 'config/github_config.yaml') -> str:
         """Generate the complete weekly GitHub summary report."""
         print(f"\n🚀 Generating GitHub Weekly Summary Report: {start_date} to {end_date}")
         print(f"📄 Using configuration: {config_file}")
@@ -482,7 +482,7 @@ def main():
     args = sys.argv[1:]
     
     # Extract config file if provided (last argument ending in .yaml)
-    config_file = 'github_config.yaml'  # Default
+    config_file = 'config/github_config.yaml'  # Default
     if args and args[-1].endswith('.yaml'):
         config_file = args.pop()  # Remove config from date args
     
