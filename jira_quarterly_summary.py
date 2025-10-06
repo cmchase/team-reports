@@ -24,7 +24,7 @@ sys.path.insert(0, '.')
 from dotenv import load_dotenv
 from jira import JIRA
 from utils.ticket import format_ticket_info
-from utils.jira import initialize_jira_client, fetch_tickets_for_date_range
+from utils.jira import initialize_jira_client, fetch_tickets_for_date_range, fetch_tickets_with_changelog, compute_cycle_time_days, compute_cycle_time_stats
 from utils.date import get_current_quarter, get_quarter_range, parse_quarter_from_date
 from utils.config import load_config, get_config
 from utils.report import generate_filename, save_report, ensure_reports_directory, render_active_config
