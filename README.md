@@ -1,170 +1,391 @@
-# Jira Weekly Reports
+# Team Reports
 
-A powerful tool for generating automated weekly team summaries from Jira tickets. This tool fetches Jira tickets based on customizable filters and categorizes them into meaningful sections for easy review and reporting.
+A comprehensive suite of tools for generating automated team summaries and performance reports from multiple data sources including Jira tickets and GitHub repositories. Create weekly, quarterly, and annual reports with rich analytics, contributor insights, and development metrics.
 
 ## 🎯 Features
 
-- **📊 Automated Reports** - Generate weekly summaries with one command
+### 📊 Multiple Report Types
+- **📅 Weekly Jira Reports** - Generate weekly team summaries from Jira tickets
+- **📆 Quarterly Jira Reports** - Long-term analysis with contributor performance metrics  
+- **🐙 GitHub Quarterly Reports** - Comprehensive GitHub repository analysis and contributor tracking
+- **🔄 Cross-Platform Insights** - Combine Jira and GitHub data for complete development visibility
+
+### 🚀 Advanced Capabilities
 - **🏷️ Smart Categorization** - Automatically categorize tickets by components, projects, and keywords
-- **📅 Flexible Date Ranges** - Generate reports for any date range
-- **📝 Markdown Output** - Clean, formatted reports in Markdown format
-- **⚙️ Customizable Configuration** - YAML-based configuration for easy customization
-- **🔍 Advanced Filtering** - Exclude specific statuses and filter by assignees
-- **📁 Organized Output** - Reports saved in dedicated Reports folder
-- **🔗 Direct Jira Integration** - Built-in Jira API integration for seamless data access
+- **📅 Flexible Date Ranges** - Generate reports for any date range (weekly, quarterly, custom)
+- **📝 Rich Markdown Output** - Clean, formatted reports with tables, links, and visual indicators
+- **⚙️ Modular Configuration** - YAML-based configuration for each report type
+- **🔍 Advanced Filtering** - Configurable status filters and assignee filtering
+- **📁 Organized Output** - Reports saved in dedicated Reports folder with consistent naming
+- **🔗 Multi-Platform Integration** - Built-in Jira and GitHub API integration
+- **🛠️ Modular Architecture** - Reusable utilities package for easy extensibility
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
 - Python 3.8 or higher
-- Jira account with API access
-- Jira API token
+- **For Jira Reports**: Jira account with API access and API token
+- **For GitHub Reports**: GitHub account with Personal Access Token
+- **For Both**: Virtual environment recommended
 
 ### Setup Steps
 
-1. **Install Dependencies** - Install required Python packages
-2. **Configure Jira Credentials** - Set up your Jira API access
-3. **Configure Team Settings** - Customize your team's configuration
-4. **Generate Reports** - Start creating weekly summaries
+1. **Install Dependencies** - Set up Python environment and install packages
+2. **Configure Credentials** - Set up API access for Jira and/or GitHub
+3. **Configure Report Settings** - Customize configurations for each report type
+4. **Generate Reports** - Start creating automated summaries
+
+## 📊 Report Types Overview
+
+| Report Type | Source | Frequency | Output | Use Case |
+|-------------|--------|-----------|--------|----------|
+| **Weekly Jira** | Jira API | Weekly | `team_summary_YYYY-MM-DD_to_YYYY-MM-DD.md` | Sprint reviews, weekly standup prep |
+| **Quarterly Jira** | Jira API | Quarterly | `quarterly_summary_QX_YYYY.md` | Performance reviews, quarterly planning |
+| **GitHub Quarterly** | GitHub API | Quarterly | `github_quarterly_summary_QX_YYYY.md` | Code contribution analysis, developer insights |
 
 ### 1. Install Dependencies
 
 ```bash
+# Create virtual environment (recommended)
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install required packages
 pip install -r requirements.txt
 ```
 
-### 2. Configure Jira Credentials
+### 2. Configure Credentials
 
-Create a `.env` file with your Jira details:
+Create a `.env` file with your API credentials:
 
+```bash
+# Copy template and edit
+cp env.template .env
+```
+
+**For Jira Reports** - Add your Jira credentials to `.env`:
 ```bash
 JIRA_SERVER=https://your-company.atlassian.net
 JIRA_EMAIL=your-email@company.com
-JIRA_API_TOKEN=your-api-token
+JIRA_API_TOKEN=your-jira-api-token
 ```
 
-**Getting your Jira API Token:**
-1. Go to your Jira account settings
-2. Navigate to Security → API tokens
-3. Create a new API token
-4. Copy the token and add it to your `.env` file
+**For GitHub Reports** - Add your GitHub token to `.env`:
+```bash
+GITHUB_TOKEN=your-github-personal-access-token
+```
 
-### 3. Configure Team Settings
+**Getting API Tokens:**
+- **Jira**: Account Settings → Security → API tokens → Create token
+- **GitHub**: Settings → Developer settings → Personal access tokens → Generate new token
+  - Required scopes: `repo` (for private repos) or `public_repo` (for public repos)
 
-Copy the example configuration and customize it:
+### 3. Configure Report Settings
 
+**For Jira Reports:**
 ```bash
 cp team_config_example.yaml team_config.yaml
+# Edit team_config.yaml with your team's projects, members, and categorization rules
 ```
 
-Edit `team_config.yaml` with your team's:
-- Projects and components
-- Team members
-- Categorization rules
-- Status filters
+**For GitHub Reports:**
+```bash  
+cp github_config_example.yaml github_config.yaml
+# Edit github_config.yaml with your repositories and team member mapping
+```
 
-### 4. Generate Your First Report
+### 4. Generate Your First Reports
 
+#### 📅 Weekly Jira Reports
 ```bash
 # Generate report for last 7 days
-python3 weekly_team_summary.py
+./run_weekly_summary.sh
 
-# Generate report for specific date range
-python3 weekly_team_summary.py 2025-09-10 2025-09-16
-
-# Use the convenient shell script
+# Generate report for specific date range  
 ./run_weekly_summary.sh 2025-09-10 2025-09-16
+```
+
+#### 📆 Quarterly Jira Reports
+```bash
+# Generate report for current quarter
+./run_quarterly_summary.sh
+
+# Generate report for specific quarter
+./run_quarterly_summary.sh 2025 4
+```
+
+#### 🐙 GitHub Quarterly Reports
+```bash
+# Generate report for current quarter
+./run_github_quarterly_summary.sh
+
+# Generate report for specific quarter
+./run_github_quarterly_summary.sh 2025 4
 ```
 
 ## 📁 Project Structure
 
 ```
-jira-weekly-reports/
-├── weekly_team_summary.py     # Main report generator
-├── server.py                  # Built-in Jira API integration
-├── run_weekly_summary.sh      # Convenient shell wrapper
-├── team_config.yaml           # Your team configuration (create this)
-├── team_config_example.yaml   # Example configuration
-├── requirements.txt           # Python dependencies
-├── .env                       # Jira credentials (create this)
-├── Reports/                   # Generated reports (auto-created)
-├── README.md                  # This file
-├── WEEKLY_SUMMARY_README.md   # Detailed usage guide
-└── CONFIGURATION_GUIDE.md     # Configuration guide
+team-reports/
+├── 📊 Core Report Generators
+│   ├── weekly_team_summary.py           # Weekly Jira reports  
+│   ├── quarterly_team_summary.py        # Quarterly Jira reports
+│   └── github_quarterly_summary.py      # GitHub quarterly reports
+├── 🚀 Execution Scripts  
+│   ├── run_weekly_summary.sh            # Weekly report runner
+│   ├── run_quarterly_summary.sh         # Quarterly Jira report runner
+│   └── run_github_quarterly_summary.sh  # GitHub report runner
+├── ⚙️ Configuration
+│   ├── env.template                     # Environment template
+│   ├── team_config_example.yaml        # Jira configuration example
+│   ├── github_config_example.yaml      # GitHub configuration example
+│   ├── team_config.yaml               # Your Jira config (create this)
+│   ├── github_config.yaml             # Your GitHub config (create this)  
+│   └── .env                           # API credentials (create this)
+├── 🛠️ Utilities Package
+│   └── utils/
+│       ├── __init__.py                 # Package initialization
+│       ├── jira.py                    # Jira API utilities
+│       ├── config.py                  # Configuration management
+│       ├── date.py                    # Date parsing and ranges
+│       ├── report.py                  # Report formatting and output
+│       └── ticket.py                  # Ticket categorization
+├── 📄 Documentation
+│   ├── README.md                      # This file
+│   ├── WEEKLY_SUMMARY_README.md       # Weekly reports guide
+│   ├── GITHUB_QUARTERLY_README.md     # GitHub reports guide
+│   ├── CONFIGURATION_GUIDE.md         # Configuration reference
+│   └── DEVELOPER_GUIDE.md            # Development guide
+├── 📁 Output
+│   └── Reports/                       # Generated reports (auto-created)
+│       ├── team_summary_*.md          # Weekly reports
+│       ├── quarterly_summary_*.md     # Quarterly Jira reports
+│       └── github_quarterly_*.md      # GitHub reports
+├── 🔧 Dependencies
+│   ├── requirements.txt               # Python package dependencies
+│   └── venv/                         # Virtual environment (create this)
+└── 📜 Project Files
+    ├── LICENSE                       # MIT license
+    └── .gitignore                   # Git ignore rules
 ```
 
-## 🔗 Dependencies
+## 🔗 Dependencies & Integrations
 
-This project includes built-in Jira API integration:
-
-- **Built-in Jira Integration** (`server.py`)
+### API Integrations
+- **Jira API Integration** (`utils/jira.py`)
   - Direct Jira API integration using the `jira` Python library
-  - Handles authentication and API communication
+  - Handles authentication, pagination, and API communication  
+  - JQL query building and ticket fetching utilities
   - No external dependencies or separate server processes required
-  - Uses your Jira credentials from the `.env` file
+
+- **GitHub API Integration** (`github_quarterly_summary.py`)
+  - Native GitHub REST API integration using `requests`
+  - Supports pull requests, commits, and issues tracking
+  - Rate limiting and pagination handling
+  - Organization and repository analysis
+
+### Python Dependencies (requirements.txt)
+```python
+jira>=3.10.5          # Jira API client
+requests>=2.31.0      # HTTP requests for GitHub API  
+python-dotenv>=1.1.1  # Environment variable management
+pyyaml>=6.0.3         # YAML configuration parsing
+```
+
+### Modular Architecture
+- **Utilities Package** (`utils/`) - Reusable components across all report types
+  - Configuration management and validation
+  - Date parsing and range calculations  
+  - Report formatting and output handling
+  - Ticket categorization and analysis
+  - Shared authentication and API utilities
 
 ## 🎯 Usage Examples
 
-### Basic Usage
+### 📅 Weekly Jira Reports
 
+**Shell Script (Recommended):**
 ```bash
-# Generate report for last 7 days
-python3 weekly_team_summary.py
-
-# Generate report for specific date range
-python3 weekly_team_summary.py 2025-09-10 2025-09-16
-
-# Generate report for current week
-python3 weekly_team_summary.py $(date -d "monday" +%Y-%m-%d) $(date -d "friday" +%Y-%m-%d)
-```
-
-### Using the Shell Script
-
-```bash
-# Make script executable
-chmod +x run_weekly_summary.sh
-
 # Generate report for last 7 days
 ./run_weekly_summary.sh
 
-# Generate report for specific date range
+# Generate report for specific date range  
 ./run_weekly_summary.sh 2025-09-10 2025-09-16
+
+# Generate report for current week
+./run_weekly_summary.sh $(date -d "monday" +%Y-%m-%d) $(date -d "sunday" +%Y-%m-%d)
+```
+
+**Python Direct:**
+```bash
+# Basic usage
+python3 weekly_team_summary.py
+
+# Specific date range
+python3 weekly_team_summary.py 2025-09-10 2025-09-16
+
+# Custom configuration
+python3 weekly_team_summary.py 2025-09-10 2025-09-16 custom_team_config.yaml
+```
+
+### 📆 Quarterly Jira Reports
+
+**Shell Script (Recommended):**
+```bash
+# Current quarter
+./run_quarterly_summary.sh
+
+# Specific quarter (Q4 2025)
+./run_quarterly_summary.sh 2025 4
+
+# Custom configuration  
+./run_quarterly_summary.sh 2025 4 custom_team_config.yaml
+```
+
+**Python Direct:**
+```bash
+# Current quarter
+python3 quarterly_team_summary.py
+
+# Specific quarter
+python3 quarterly_team_summary.py 2025 4
+
+# With custom config
+python3 quarterly_team_summary.py 2025 4 custom_config.yaml
+```
+
+### 🐙 GitHub Quarterly Reports
+
+**Shell Script (Recommended):**
+```bash
+# Current quarter
+./run_github_quarterly_summary.sh
+
+# Specific quarter (Q4 2025)
+./run_github_quarterly_summary.sh 2025 4
+
+# Custom configuration
+./run_github_quarterly_summary.sh 2025 4 custom_github_config.yaml
+```
+
+**Python Direct:**
+```bash
+# Current quarter
+python3 github_quarterly_summary.py
+
+# Specific quarter
+python3 github_quarterly_summary.py 2025 4
+
+# With custom config  
+python3 github_quarterly_summary.py 2025 4 custom_config.yaml
+```
+
+### 🔄 Batch Report Generation
+
+**Generate all reports for current period:**
+```bash
+# Weekly + Quarterly Jira + GitHub Quarterly
+./run_weekly_summary.sh
+./run_quarterly_summary.sh  
+./run_github_quarterly_summary.sh
 ```
 
 ## 📊 Report Output
 
-Reports are generated in Markdown format and include:
+All reports are generated in clean Markdown format with rich formatting, tables, and links.
 
-- **📅 Date Range** - Clear indication of the reporting period
-- **📈 Summary Statistics** - Total tickets, categories breakdown
+### 📅 Weekly Jira Reports
+
+**Features:**
+- **📅 Date Range** - Clear indication of the reporting period  
+- **📈 Summary Statistics** - Total tickets and category breakdown
 - **🏷️ Categorized Sections** - Tickets organized by your defined categories
 - **📋 Ticket Details** - Key, summary, status, assignee, priority, and URL
-- **📁 Organized Storage** - Reports saved in `Reports/` folder
+- **📊 Status Breakdown** - Tickets grouped by status with counts
 
-### Example Report Structure
-
+**Example Output:**
 ```markdown
 # 📊 WEEKLY TEAM SUMMARY: 2025-09-10 to 2025-09-16
 
 ## 📈 OVERVIEW
-- **Total Tickets:** 110
-- **Edge Decommission:** 16 tickets
-- **Remediations Core:** 53 tickets
-- **QE / Integrations:** 20 tickets
+- **Total Tickets:** 110  
+- **Backend Development:** 53 tickets
+- **Frontend Development:** 32 tickets
+- **QE / Testing:** 20 tickets
 
-### 🎯 REMEDIATIONS CORE - Remediations, Frontend
+### 🎯 BACKEND DEVELOPMENT - API, Services
 
 #### 📌 In Progress (5 tickets)
-
 | Ticket ID | Assignee | Priority | Updated | Title |
 |-----------|----------|----------|---------|-------|
 | [PROJ-123](url) | John Doe | Major | 2025-09-13 | Implement new API endpoint |
 ```
 
+### 📆 Quarterly Jira Reports
+
+**Features:**
+- **👥 Individual Contributor Analysis** - Detailed performance per team member
+- **📊 Story Point Tracking** - Completion metrics and productivity analysis
+- **📈 Trend Analysis** - Quarter-over-quarter performance insights
+- **🏆 Top Contributors** - Recognition of high-performing team members
+- **📋 Comprehensive Ticket Lists** - All tickets with detailed categorization
+
+**Example Output:**
+```markdown
+# 📆 QUARTERLY TEAM SUMMARY: Q4 2025
+
+## 📈 EXECUTIVE SUMMARY  
+- **Total Tickets Completed:** 342
+- **Total Story Points:** 1,247
+- **Top Contributor:** Jane Smith (89 tickets, 276 story points)
+- **Most Active Category:** Backend Development (156 tickets)
+
+## 👥 INDIVIDUAL CONTRIBUTOR PERFORMANCE
+### 🏆 Jane Smith
+- **Tickets Completed:** 89 tickets
+- **Story Points:** 276 points  
+- **Average per Month:** 29.7 tickets, 92 story points
+```
+
+### 🐙 GitHub Quarterly Reports  
+
+**Features:**
+- **🔄 Pull Request Analysis** - Contribution tracking across repositories
+- **💻 Code Metrics** - Lines added/removed, files changed
+- **📊 Repository Activity** - Cross-repo contribution analysis
+- **👥 Contributor Insights** - Individual and team performance metrics
+- **📈 Monthly Trends** - Activity patterns over the quarter
+
+**Example Output:**
+```markdown
+# 🐙 GITHUB QUARTERLY REPORT: Q4 2025
+
+## 📈 QUARTER OVERVIEW
+- **Total Contributors:** 12
+- **Total Pull Requests:** 156  
+- **Total Commits:** 423
+- **Lines Added:** +12,847
+- **Lines Removed:** -8,234
+
+## 🏆 TOP CONTRIBUTORS  
+| Contributor | PRs | Commits | Lines + | Lines - |
+|-------------|-----|---------|---------|---------|
+| Jane Smith | 34 | 89 | +3,421 | -1,876 |
+```
+
+### 📁 Output Organization
+
+All reports are saved in the `Reports/` directory with consistent naming:
+- **Weekly**: `team_summary_2025-09-10_to_2025-09-16.md`
+- **Quarterly Jira**: `quarterly_summary_Q4_2025.md`  
+- **GitHub Quarterly**: `github_quarterly_summary_Q4_2025.md`
+
 ## ⚙️ Configuration
 
-### Team Configuration (`team_config.yaml`)
+### Jira Configuration (`team_config.yaml`)
+
+**For Weekly & Quarterly Jira Reports**
 
 ```yaml
 # Base JQL filter for your team
@@ -175,7 +396,7 @@ base_jql: |
 team_categories:
   Backend Development:
     components: ["Backend", "API"]
-    keywords: ["database", "service"]
+    keywords: ["database", "service"]  
     description: "Backend services and API development"
 
   Frontend Development:
@@ -183,79 +404,212 @@ team_categories:
     keywords: ["react", "typescript"]
     description: "Frontend and user interface work"
 
-# Status filters
+  Quality Engineering:
+    components: ["QE", "Testing"]
+    projects: ["TESTS"]
+    description: "Quality engineering and testing"
+
+# Team member mapping (email to display name)
+team_members:
+  "user1@company.com": "John Developer"
+  "user2@company.com": "Jane Engineer"
+  "qa@company.com": "Bob Tester"
+
+# Status filters for different report types
 status_filters:
   all:
     - "New"
-    - "Refinement"
+    - "Refinement" 
     - "To Do"
     - "In Progress"
     - "Review"
     - "Closed"
-  planned_only:
-    - "New"
-    - "Refinement"
-    - "To Do"
-  executed_only:
+  completed:
+    - "Closed"
+  execution:
     - "In Progress"
     - "Review"
-    - "Closed"
-  completed_only:
-    - "Closed"
-  exclude:
-    - "New"
-    - "Refinement"
-    - "To Do"
 
 # Report settings
 report_settings:
   max_results: 200
   order_by: "component ASC, updated DESC"
+  default_status_filter: "completed"
+```
+
+### GitHub Configuration (`github_config.yaml`)
+
+**For GitHub Quarterly Reports**
+
+```yaml
+# GitHub organization (optional)
+github_org: "your-organization"
+
+# Repositories to analyze 
+repositories:
+  - "repo1"
+  - "repo2"
+  - "repo3"
+
+# Team member mapping (GitHub username → Display name)
+team_members:
+  "github_username1": "John Developer"
+  "github_username2": "Jane Engineer" 
+  "octocat": "GitHub Mascot"
+
+# Report settings
+report_settings:
+  max_results: 100
+  include_private: true
+  track_pull_requests: true
+  track_commits: true
+  track_issues: true
+
+# Repository filters
+repository_filters:
+  exclude_archived: true
+  exclude_forks: true
+  only_active_repos: true
+
+# Contributor filters  
+contributor_filters:
+  exclude_bots: true
+  bot_patterns:
+    - "bot"
+    - "dependabot"
+    - "renovate"
+  min_contributions: 1
 ```
 
 ### Environment Variables (`.env`)
 
+**API Credentials for all reports**
+
 ```bash
+# Jira API credentials (for Jira reports)
 JIRA_SERVER=https://your-company.atlassian.net
 JIRA_EMAIL=your-email@company.com
-JIRA_API_TOKEN=your-api-token
+JIRA_API_TOKEN=your-jira-api-token
+
+# GitHub API credentials (for GitHub reports)  
+GITHUB_TOKEN=your-github-personal-access-token
 ```
 
 ## 🔧 Customization
 
-### Adding New Categories
+### Adding New Jira Categories
 
-1. Edit `team_config.yaml`
-2. Add new category under `team_categories`
-3. Define matching rules (components, projects, keywords)
-4. Regenerate reports
+1. **Edit `team_config.yaml`**
+2. **Add new category** under `team_categories`
+3. **Define matching rules** (components, projects, keywords)
+4. **Regenerate reports** to see new categorization
 
-### Filtering by Status
+```yaml
+team_categories:
+  DevOps:
+    keywords: ["deployment", "infrastructure", "kubernetes"]
+    description: "DevOps and infrastructure work"
+  
+  Security:
+    keywords: ["security", "vulnerability", "audit"] 
+    description: "Security-related work and vulnerability fixes"
+```
+
+### Configuring Status Filters
+
+**Multiple filter types for different use cases:**
 
 ```yaml
 status_filters:
-  exclude: ["New", "Refinement", "To Do"]
+  # Show all tickets regardless of status
+  all: ["New", "To Do", "In Progress", "Review", "Closed"]
+  
+  # Show only completed work  
+  completed: ["Closed"]
+  
+  # Show work in active execution
+  execution: ["In Progress", "Review"]
+  
+  # Custom filter
+  my_filter: ["To Do", "In Progress"]
 ```
 
-### Filtering by Assignee
+### Adding GitHub Repositories
+
+1. **Edit `github_config.yaml`**
+2. **Add repositories** to the list
+3. **Map contributors** in `team_members` section
+4. **Regenerate reports** to include new repos
 
 ```yaml
-base_jql: |
-  project = PROJ AND assignee in ("manager@company.com", "dev1@company.com")
+repositories:
+  - "new-repo"
+  - "another-project"
+  
+team_members:
+  "new_github_user": "New Team Member"
+```
+
+### Extending with Utils Package
+
+**The modular utilities package allows easy extension:**
+
+```python
+# Custom report using existing utilities
+from utils.jira import fetch_tickets_for_date_range
+from utils.config import load_config  
+from utils.report import save_report
+
+# Build custom analysis with reusable components
+config = load_config('my_config.yaml')
+tickets = fetch_tickets_for_date_range(start_date, end_date, config)
+# ... custom analysis logic ...
+save_report(content, filename)
 ```
 
 ## 📖 Documentation
 
-- **[WEEKLY_SUMMARY_README.md](WEEKLY_SUMMARY_README.md)** - Detailed usage guide
-- **[CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)** - Advanced configuration options
-- **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** - Implementation guide for AI assistants and developers
+| Document | Purpose | Audience |
+|----------|---------|----------|  
+| **[WEEKLY_SUMMARY_README.md](WEEKLY_SUMMARY_README.md)** | Detailed weekly reports guide | End users |
+| **[GITHUB_QUARTERLY_README.md](GITHUB_QUARTERLY_README.md)** | GitHub reports comprehensive guide | End users |
+| **[CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)** | Advanced configuration options | Power users |
+| **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** | Implementation and extension guide | Developers |
 
 ## 🔒 Security
 
-- **Never commit `.env` file** - Contains sensitive credentials
-- **Never commit `team_config.yaml`** - Contains team-specific data
-- **Use API tokens** instead of passwords
-- **Rotate tokens regularly** for security
+### 🔐 Credential Management
+- **Never commit `.env` file** - Contains sensitive API tokens and credentials
+- **Never commit configuration files with real data**:
+  - `team_config.yaml` - Contains team-specific Jira information
+  - `github_config.yaml` - Contains GitHub repository and team data
+- **Use example files as templates** - Copy from `*_example.yaml` files
+- **Store credentials securely** - Use `.env` file for all API tokens
+
+### 🛡️ API Token Security  
+- **Use API tokens instead of passwords** for both Jira and GitHub
+- **Rotate tokens regularly** for enhanced security
+- **Minimum required permissions**:
+  - **Jira**: Read access to projects and issues
+  - **GitHub**: `repo` scope for private repositories, `public_repo` for public only
+- **Monitor token usage** through provider dashboards
+
+### 📁 File Security
+**Files properly ignored in `.gitignore`:**
+```
+.env                    # API credentials
+team_config.yaml        # Team-specific Jira config  
+github_config.yaml      # GitHub repositories and team mapping
+Reports/                # Generated reports (may contain sensitive data)
+```
+
+**Safe to commit:**
+```
+*_example.yaml          # Template configuration files
+env.template           # Environment variable template
+run_*.sh               # Execution scripts
+*.py                   # Source code
+```
 
 ## 🐛 Troubleshooting
 
@@ -298,10 +652,34 @@ logging.basicConfig(level=logging.DEBUG)
 
 ## 🆕 Recent Updates
 
-- **✅ Built-in Jira Integration** - No external dependencies or separate server processes required
-- **✅ Improved Data Handling** - Direct access to Jira Issue objects with full field information
-- **✅ Better Report Formatting** - Enhanced ticket details including proper priorities and statuses
-- **✅ Simplified Setup** - Create `.env` file with your Jira credentials and you're ready to go
+### 🚀 Major New Features
+
+- **✅ GitHub Quarterly Reports** - Complete GitHub repository analysis system
+  - Pull request, commit, and issue tracking across multiple repositories
+  - Contributor performance analysis with code change metrics
+  - Repository activity breakdown and cross-repo insights
+  - Team member mapping from GitHub usernames to display names
+  
+- **✅ Quarterly Jira Analysis** - Long-term team performance reporting
+  - Individual contributor performance tracking with story point analysis
+  - Quarterly trend analysis and productivity metrics
+  - Executive summary with key insights and top contributor recognition
+  - Comprehensive ticket categorization and completion tracking
+
+- **✅ Modular Utilities Architecture** - Reusable component system
+  - Organized `utils/` package with specialized modules
+  - Shared configuration management and validation
+  - Common date parsing and report formatting utilities
+  - Extensible architecture for custom report development
+
+### 🛠️ Technical Improvements
+
+- **✅ Multi-Platform Integration** - Unified credential management for Jira and GitHub APIs
+- **✅ Enhanced Configuration** - Separate config files for different report types
+- **✅ Shell Script Automation** - Convenient execution scripts with error handling
+- **✅ Rich Report Output** - Enhanced Markdown formatting with tables and visual indicators
+- **✅ Improved Data Handling** - Robust API pagination and rate limiting
+- **✅ Comprehensive Documentation** - Detailed guides for each report type
 
 ## 🤝 Contributing
 
@@ -317,13 +695,32 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🎉 Success!
 
-Your Jira Weekly Reports tool is now ready to use! You can:
+Your comprehensive Team Reports suite is now ready to use! You can:
 
-- ✅ Generate automated weekly summaries
-- ✅ Categorize tickets automatically
-- ✅ Customize reports for your team
-- ✅ Export clean Markdown reports
-- ✅ Schedule regular reporting
-- ✅ Use built-in Jira API integration for seamless data access
+### 📊 Multi-Platform Reporting
+- ✅ **Generate weekly Jira summaries** for sprint reviews and team standups
+- ✅ **Create quarterly Jira analysis** for performance reviews and planning
+- ✅ **Produce GitHub quarterly reports** for code contribution insights
+- ✅ **Combine insights** across Jira tickets and GitHub contributions
 
-Start generating your first report and see how it transforms your team's Jira data into actionable insights! 🚀
+### 🚀 Advanced Capabilities  
+- ✅ **Smart ticket categorization** with customizable rules and filters
+- ✅ **Individual contributor tracking** with detailed performance metrics
+- ✅ **Cross-repository analysis** for complete development visibility  
+- ✅ **Rich Markdown output** with tables, links, and visual indicators
+- ✅ **Automated execution** via convenient shell scripts
+- ✅ **Extensible architecture** using modular utilities package
+
+### 🛠️ Enterprise Ready
+- ✅ **Secure credential management** with environment variables
+- ✅ **Comprehensive configuration** for different team structures
+- ✅ **Robust error handling** and API rate limiting
+- ✅ **Detailed documentation** for users and developers
+- ✅ **Scalable design** for teams of any size
+
+**Start generating reports and transform your team's development data into actionable insights!** 🚀
+
+Choose your report type:
+- `./run_weekly_summary.sh` for sprint insights
+- `./run_quarterly_summary.sh` for performance analysis  
+- `./run_github_quarterly_summary.sh` for code contribution tracking
