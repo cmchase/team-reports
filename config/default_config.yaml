@@ -26,7 +26,7 @@ bots: []
 # Report generation settings
 report:
   show_active_config: true
-  enable_categorization: true  # Set to false for consolidated view
+  enable_categorization: false  # Set to false for consolidated view
   max_results: 200
   order_by: "updated DESC"
   
