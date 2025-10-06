@@ -106,6 +106,10 @@ cp config/github_config_example.yaml config/github_config.yaml
 
 # Generate report for specific date range  
 ./run_jira_weekly_summary.sh 2025-09-10 2025-09-16
+
+# Generate multiple weekly reports (batch processing)
+./run_batch_weekly.sh jira last-4    # Last 4 Jira reports
+./run_batch_weekly.sh github last-4  # Last 4 GitHub reports
 ```
 
 #### 🐙 Weekly GitHub Reports
@@ -147,6 +151,7 @@ team-reports/
 ├── 🚀 Execution Scripts  
 │   ├── run_jira_weekly_summary.sh       # Weekly Jira report runner
 │   ├── run_github_weekly_summary.sh     # Weekly GitHub report runner
+│   ├── run_batch_weekly.sh              # Batch weekly report runner (Jira + GitHub)
 │   ├── run_jira_quarterly_summary.sh    # Quarterly Jira report runner
 │   └── run_github_quarterly_summary.sh  # GitHub quarterly report runner
 ├── ⚙️ Configuration
@@ -159,9 +164,10 @@ team-reports/
 ├── 🛠️ Utilities Package
 │   └── utils/
 │       ├── __init__.py                 # Package initialization
-│       ├── jira.py                    # Jira API utilities
+│       ├── batch.py                   # Batch processing and date utilities
 │       ├── config.py                  # Configuration management
 │       ├── date.py                    # Date parsing and ranges
+│       ├── jira.py                    # Jira API utilities
 │       ├── report.py                  # Report formatting and output
 │       └── ticket.py                  # Ticket categorization
 ├── 📄 Documentation
@@ -255,6 +261,21 @@ Environment variables are mapped into the `env.*` namespace for secure display i
 ./run_jira_weekly_summary.sh $(date -d "monday" +%Y-%m-%d) $(date -d "sunday" +%Y-%m-%d)
 ```
 
+**Batch Processing (Multiple Weeks):**
+```bash
+# Generate Jira reports for the last 4 weeks
+./run_batch_weekly.sh jira last-4
+
+# Generate 6 GitHub weekly reports starting from a specific date
+./run_batch_weekly.sh github 2025-09-01:6
+
+# Generate all Jira weekly reports between two dates
+./run_batch_weekly.sh jira 2025-09-01 to 2025-10-20
+
+# Batch with custom config
+./run_batch_weekly.sh github last-3 config/custom_github_config.yaml
+```
+
 **Python Direct:**
 ```bash
 # Basic usage
@@ -346,6 +367,17 @@ python3 github_quarterly_summary.py 2025 4 custom_config.yaml
 ```
 
 ### 🔄 Batch Report Generation
+
+**Multi-Week Batch Processing:**
+```bash
+# Generate multiple weeks efficiently
+./run_batch_weekly.sh jira last-4                    # Last 4 Jira weekly reports
+./run_batch_weekly.sh github 2025-09-01:8            # 8 GitHub reports from Sept 1st
+./run_batch_weekly.sh jira 2025-08-01 to 2025-10-01  # All Jira reports in date range
+
+# Custom configurations
+./run_batch_weekly.sh github last-6 config/custom_github_config.yaml
+```
 
 **Generate all reports for current period:**
 ```bash
