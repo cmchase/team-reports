@@ -74,8 +74,26 @@ class WeeklyTeamSummary:
         
     def generate_summary_report(self, categorized_tickets: Dict[str, List], start_date: str, end_date: str) -> str:
         """Generate a formatted summary report"""
+        # Generate user-friendly title with day of week
+        from datetime import datetime
+        start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+        end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+        
+        # Format: "WEEKLY TEAM SUMMARY: Sunday Oct 6 to Saturday Oct 12, 2025"
+        # Cross-platform date formatting (%-d doesn't work on Windows)
+        try:
+            start_day = start_dt.strftime('%A %b %-d')  # "Sunday Oct 6"  
+            end_day = end_dt.strftime('%A %b %-d')      # "Saturday Oct 12"
+        except ValueError:
+            # Fallback for Windows - remove leading zero manually
+            start_day = start_dt.strftime('%A %b %d').replace(' 0', ' ')
+            end_day = end_dt.strftime('%A %b %d').replace(' 0', ' ')
+        year = start_dt.year
+        
+        title = f"WEEKLY TEAM SUMMARY: {start_day} to {end_day}, {year}"
+        
         return create_summary_report(
-            "WEEKLY TEAM SUMMARY",
+            title,
             start_date,
             end_date,
             categorized_tickets,
@@ -102,10 +120,6 @@ class WeeklyTeamSummary:
         # Generate report
         return self.generate_summary_report(categorized_tickets, start_date, end_date)
         
-def parse_date_args():
-    """Parse command line date arguments or use current week"""
-    # Use the utility function
-    return parse_date_args_util(sys.argv[1:])
 
 def generate_cycle_time_analysis(config: Dict[str, Any], start_date: str, end_date: str) -> str:
     """
@@ -200,16 +214,24 @@ def generate_cycle_time_analysis(config: Dict[str, Any], start_date: str, end_da
 def main():
     """Main function"""
     try:
-        start_date, end_date = parse_date_args()
+        # Extract config file first, before date parsing
+        config_file = 'team_config.yaml'
+        date_args = []
+        
+        # Filter sys.argv to separate date args from config file
+        for arg in sys.argv[1:]:
+            if arg.endswith('.yaml'):
+                config_file = arg
+                print(f"📝 Using custom config file: {config_file}")
+            else:
+                date_args.append(arg)
+        
+        # Parse dates from filtered arguments
+        from utils.date import parse_date_args as parse_date_args_util
+        start_date, end_date = parse_date_args_util(date_args)
         
         print(f"🚀 Generating weekly team summary for {start_date} to {end_date}")
         print("=" * 60)
-        
-        # Check for custom config file argument
-        config_file = 'team_config.yaml'
-        if len(sys.argv) >= 4 and sys.argv[3].endswith('.yaml'):
-            config_file = sys.argv[3]
-            print(f"📝 Using custom config file: {config_file}")
         
         # Load configuration and setup feature flags
         config = get_config([config_file])
