@@ -49,23 +49,23 @@ class TestFormatTableRow:
         assert 'Test ticket summary' in row
         assert '[TEST-123](https://jira.example.com/browse/TEST-123)' in row
     
-    def test_format_long_title_truncated(self):
-        """Test that long titles are truncated properly."""
+    def test_format_long_title_not_truncated(self):
+        """Test that long titles are displayed in full without truncation."""
         ticket_info = {
             'key': 'TEST-123',
             'url': 'https://jira.example.com/browse/TEST-123',
-            'summary': 'This is a very long ticket title that should be truncated because it exceeds the maximum width',
+            'summary': 'This is a very long ticket title that should be displayed in full because truncation has been removed',
             'assignee': 'John Doe',
             'priority': 'High',
             'updated': '2025-01-01'
         }
         
-        row = format_table_row(ticket_info, title_width=50)
+        row = format_table_row(ticket_info)
         
-        # Should contain truncated title with ellipsis
-        assert '...' in row
-        # Should not contain the full original title
-        assert 'exceeds the maximum width' not in row
+        # Should contain the full title without truncation
+        assert 'This is a very long ticket title that should be displayed in full because truncation has been removed' in row
+        # Should not contain ellipsis (no truncation)
+        assert '...' not in row
     
     def test_format_long_assignee_truncated(self):
         """Test that long assignee names are truncated."""

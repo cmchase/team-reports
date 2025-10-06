@@ -14,14 +14,12 @@ from typing import Dict, List, Any, Optional
 from collections import defaultdict
 
 
-def format_table_row(ticket_info: Dict[str, str], title_width: int = 50, 
-                    assignee_width: int = 20) -> str:
+def format_table_row(ticket_info: Dict[str, str], assignee_width: int = 20) -> str:
     """
     Format a single ticket as a markdown table row.
     
     Args:
         ticket_info: Dictionary containing ticket information
-        title_width: Maximum width for the title column
         assignee_width: Maximum width for the assignee column
         
     Returns:
@@ -40,17 +38,14 @@ def format_table_row(ticket_info: Dict[str, str], title_width: int = 50,
     # Create markdown link for ticket ID
     ticket_link = f"[{ticket_info['key']}]({ticket_info['url']})"
     
-    # Truncate title if too long
     title = ticket_info['summary']
-    if len(title) > title_width:
-        title = title[:title_width-3] + "..."
     
     # Truncate assignee if too long  
     assignee = ticket_info['assignee']
     if len(assignee) > assignee_width:
         assignee = assignee[:assignee_width-3] + "..."
     
-    return f"| {ticket_link:<25} | {assignee:<{assignee_width}} | {ticket_info['priority']:<8} | {ticket_info['updated']:<10} | {title:<{title_width}} |"
+    return f"| {ticket_link:<25} | {assignee:<{assignee_width}} | {ticket_info['priority']:<8} | {ticket_info['updated']:<10} | {title} |"
 
 
 def create_table_header() -> List[str]:
@@ -61,8 +56,8 @@ def create_table_header() -> List[str]:
         List[str]: Table header lines
     """
     return [
-        "| Ticket ID                | Assignee             | Priority | Updated    | Title                                              |",
-        "|--------------------------|----------------------|----------|------------|----------------------------------------------------| "
+        "| Ticket ID                | Assignee             | Priority | Updated    | Title |",
+        "|--------------------------|----------------------|----------|------------|-------|"
     ]
 
 
