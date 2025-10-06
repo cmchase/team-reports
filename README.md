@@ -215,6 +215,30 @@ pyyaml>=6.0.3         # YAML configuration parsing
   - Ticket categorization and analysis
   - Shared authentication and API utilities
 
+## ⚙️ Configuration Precedence
+
+Team Reports uses a **layered configuration system** with deterministic precedence:
+
+```
+1. config/default_config.yaml    (Base defaults)
+2. team_config.yaml              (User YAML files)  
+3. github_config.yaml            (User YAML files)
+4. .env environment overrides    (Highest priority)
+```
+
+### Environment Variable Mapping
+
+Environment variables are mapped into the `env.*` namespace for secure display in report footers:
+
+| Environment Variable | Config Path | Description |
+|---------------------|-------------|-------------|
+| `JIRA_SERVER` | `env.jira.server` | Jira instance URL |
+| `JIRA_EMAIL` | `env.jira.email` | Jira authentication email |
+| `JIRA_API_TOKEN` | `env.jira.token` | Jira API token (redacted) |
+| `GITHUB_TOKEN` | `env.github.token` | GitHub API token (redacted) |
+
+**Security Note:** Environment overrides are displayed in report footers (when `report.show_active_config: true`) with automatic redaction of sensitive values like tokens and credentials.
+
 ## 🎯 Usage Examples
 
 ### 📅 Weekly Jira Reports

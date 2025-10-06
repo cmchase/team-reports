@@ -56,12 +56,16 @@ class TestRedactSecrets:
         assert redacted['timeout'] == 30  # Not redacted
     
     def test_redact_env_namespace(self):
-        """Test redaction of all values under env namespace."""
+        """Test redaction of all values under env namespace with structured paths."""
         config = {
             'env': {
-                'github_token': 'token123',
-                'jira_server': 'https://company.atlassian.net',
-                'database_url': 'postgres://user:pass@host/db'
+                'jira': {
+                    'server': 'https://company.atlassian.net',
+                    'token': 'jira_token_123'
+                },
+                'github': {
+                    'token': 'github_token_456'
+                }
             },
             'report': {
                 'github_token': 'should_redact',  # Still redacted due to key name
@@ -71,10 +75,10 @@ class TestRedactSecrets:
         
         redacted = redact_secrets(config)
         
-        # All env values should be redacted
-        assert redacted['env']['github_token'] == '****'
-        assert redacted['env']['jira_server'] == '****'
-        assert redacted['env']['database_url'] == '****'
+        # All env values should be redacted (structured)
+        assert redacted['env']['jira']['server'] == '****'
+        assert redacted['env']['jira']['token'] == '****'
+        assert redacted['env']['github']['token'] == '****'
         
         # Non-env values follow normal rules
         assert redacted['report']['github_token'] == '****'  # Key contains 'token'
@@ -234,10 +238,15 @@ class TestRenderActiveConfig:
         """Test rendering with complex nested structures and redaction."""
         config = {
             'report': {'show_active_config': True},
-            'env': {
-                'github_token': 'env_token_123',
-                'jira_server': 'https://company.atlassian.net'
+        'env': {
+            'jira': {
+                'server': 'https://company.atlassian.net',
+                'token': 'env_jira_token_123'
             },
+            'github': {
+                'token': 'env_github_token_456'
+            }
+        },
             'team_categories': {
                 'Backend': {
                     'keywords': ['api', 'database'],
@@ -264,7 +273,9 @@ class TestRenderActiveConfig:
         yaml_content = '\n'.join(line for line in lines if not line.strip().startswith('#') and '```' not in line and '<' not in line)
         
         # Secrets should be redacted
-        assert 'github_token: ****' in yaml_content or '****' in result
+        assert '****' in result  # Various tokens should be redacted
+        assert 'env_jira_token_123' not in result  # Raw token should not appear
+        assert 'env_github_token_456' not in result  # Raw token should not appear
         # Regular content should be preserved
         assert 'Backend' in result
         assert 'api' in result

@@ -230,34 +230,35 @@ class TestLoadEnvOverrides:
     @patch.dict(os.environ, {
         'GITHUB_TOKEN': 'env-github-token',
         'JIRA_SERVER': 'https://env-jira.atlassian.net',
-        'JIRA_USERNAME': 'env-user'
+        'JIRA_EMAIL': 'env-user@example.com',
+        'JIRA_API_TOKEN': 'env-jira-token'
     })
     def test_load_env_overrides_with_values(self):
         """Test loading environment overrides when variables are set."""
         config = load_env_overrides()
         
         assert 'env' in config
-        assert config['env']['github_token'] == 'env-github-token'
-        assert config['env']['jira_server'] == 'https://env-jira.atlassian.net'
-        assert config['env']['jira_username'] == 'env-user'
+        assert config['env']['github']['token'] == 'env-github-token'
+        assert config['env']['jira']['server'] == 'https://env-jira.atlassian.net'
+        assert config['env']['jira']['email'] == 'env-user@example.com'
+        assert config['env']['jira']['token'] == 'env-jira-token'
         
-        # Should not include unset variables
-        assert 'jira_token' not in config['env']
+        # All sections present when their variables are set
     
     @patch.dict(os.environ, {}, clear=True)
     def test_load_env_overrides_no_values(self):
         """Test loading environment overrides when no variables are set."""
         config = load_env_overrides()
         
-        assert config == {'env': {}}
+        assert config == {}
     
     @patch.dict(os.environ, {'GITHUB_TOKEN': 'test-token'})
     def test_load_env_overrides_partial_values(self):
         """Test loading environment overrides with only some variables set."""
         config = load_env_overrides()
         
-        assert config['env']['github_token'] == 'test-token'
-        assert len(config['env']) == 1
+        assert config['env']['github']['token'] == 'test-token'
+        assert 'jira' not in config['env']
 
 
 class TestGetConfig:
@@ -299,7 +300,7 @@ class TestGetConfig:
         
         # Should have all levels
         assert config['github']['org'] == 'test-org'  # From user config
-        assert config['env']['github_token'] == 'env-override-token'  # From env
+        assert config['env']['github']['token'] == 'env-override-token'  # From env
         assert config['report']['show_active_config'] is True  # From defaults
     
     def test_get_config_precedence_order(self):
@@ -386,8 +387,8 @@ class TestConfigIntegration:
             assert config['team_members']['test@example.com'] == "Test User (Updated)"
             
             # From environment (should be in env namespace)
-            assert config['env']['github_token'] == 'final-env-token'
-            assert config['env']['jira_server'] == 'https://final-env.atlassian.net'
+            assert config['env']['github']['token'] == 'final-env-token'
+            assert config['env']['jira']['server'] == 'https://final-env.atlassian.net'
 
 
 if __name__ == "__main__":

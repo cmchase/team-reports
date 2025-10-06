@@ -546,36 +546,56 @@ def load_env_overrides() -> Dict[str, Any]:
     """
     Load configuration overrides from environment variables.
     
-    Maps selected environment variables into config structure under env.* namespace.
-    This allows displaying env vars in active config without writing them to disk.
+    Maps known environment variables into structured config under env.* namespace.
+    This allows displaying env vars in active config (with redaction) without
+    writing secrets to disk.
     
     Returns:
-        Dict[str, Any]: Configuration with env overrides
+        Dict[str, Any]: Configuration with structured env overrides
         
-    Environment Variables:
-        JIRA_SERVER -> env.jira_server
-        GITHUB_TOKEN -> env.github_token  
-        JIRA_TOKEN -> env.jira_token
+    Environment Variable Mapping:
+        JIRA_SERVER -> env.jira.server
+        JIRA_EMAIL -> env.jira.email  
+        JIRA_API_TOKEN -> env.jira.token (redacted in display)
+        GITHUB_TOKEN -> env.github.token (redacted in display)
+        
+    Unknown environment variables are ignored for security.
         
     Example:
         env_config = load_env_overrides()
-        print(env_config['env']['github_token'])  # from GITHUB_TOKEN env var
+        print(env_config['env']['jira']['server'])  # from JIRA_SERVER
+        print(env_config['env']['github']['token']) # from GITHUB_TOKEN (redacted in render)
     """
-    env_config = {"env": {}}
-    
-    # Map environment variables to config paths
-    env_mappings = {
-        'JIRA_SERVER': 'jira_server',
-        'GITHUB_TOKEN': 'github_token', 
-        'JIRA_TOKEN': 'jira_token',
-        'JIRA_USERNAME': 'jira_username',
-        'JIRA_PASSWORD': 'jira_password'
+    env_config = {
+        "env": {
+            "jira": {},
+            "github": {}
+        }
     }
     
-    for env_var, config_key in env_mappings.items():
+    # Map known environment variables to structured config paths
+    env_mappings = {
+        # JIRA configuration
+        'JIRA_SERVER': ('jira', 'server'),
+        'JIRA_EMAIL': ('jira', 'email'),
+        'JIRA_API_TOKEN': ('jira', 'token'),
+        
+        # GitHub configuration  
+        'GITHUB_TOKEN': ('github', 'token'),
+    }
+    
+    for env_var, (section, key) in env_mappings.items():
         value = os.getenv(env_var)
         if value:
-            env_config['env'][config_key] = value
+            env_config['env'][section][key] = value
+    
+    # Clean up empty sections
+    if not env_config['env']['jira']:
+        del env_config['env']['jira']
+    if not env_config['env']['github']:
+        del env_config['env']['github']
+    if not env_config['env']:
+        del env_config['env']
     
     return env_config
 
