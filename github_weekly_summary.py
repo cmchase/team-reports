@@ -28,6 +28,7 @@ from dotenv import load_dotenv
 from utils.date import parse_date_args, get_current_week
 from utils.config import load_config, get_config
 from utils.report import ensure_reports_directory, save_report, generate_filename, render_active_config
+from utils.github import compute_pr_lead_time_stats, format_lead_time_duration
 
 # Load environment variables
 load_dotenv()
@@ -54,8 +55,8 @@ class GitHubWeeklySummary:
         }
 
     def _load_config(self, config_file: str) -> Dict[str, Any]:
-        """Load configuration from YAML file."""
-        return load_config(config_file)
+        """Load configuration from YAML file with defaults and environment overrides."""
+        return get_config([config_file])
 
     def _github_request(self, endpoint: str, params: Optional[Dict] = None) -> List[Dict]:
         """Make a request to GitHub API with pagination support."""
@@ -476,6 +477,120 @@ class GitHubWeeklySummary:
         return '\n'.join(report_lines)
 
 
+def generate_pr_lead_time_analysis(config: Dict[str, Any], start_date: str, end_date: str) -> str:
+    """
+    Generate PR lead time analysis section for weekly report.
+    
+    Args:
+        config: Configuration dictionary with GitHub settings
+        start_date: Start date in YYYY-MM-DD format
+        end_date: End date in YYYY-MM-DD format
+        
+    Returns:
+        str: Markdown section with PR lead time analysis
+    """
+    try:
+        # Initialize GitHub client
+        github_token = os.getenv('GITHUB_TOKEN')
+        if not github_token:
+            return "\n\n### 🚀 Delivery • PR Lead Time\n\n*Error: GITHUB_TOKEN not configured*\n"
+        
+        # Get configuration values
+        repositories = config.get('repositories', [])
+        github_org = config.get('github_org', config.get('github', {}).get('org', ''))
+        min_lines_changed = config.get('thresholds', {}).get('delivery', {}).get('min_lines_changed', 5)
+        
+        if not repositories:
+            return "\n\n### 🚀 Delivery • PR Lead Time\n\n*No repositories configured for analysis*\n"
+        
+        print(f"🚀 Computing PR lead time analysis...")
+        
+        # Collect all merged PRs from the period
+        all_prs = []
+        
+        # Create temporary GitHub client to fetch PR data
+        headers = {
+            'Authorization': f'token {github_token}',
+            'Accept': 'application/vnd.github.v3+json'
+        }
+        
+        for repo in repositories:
+            repo_path = f"{github_org}/{repo}" if github_org else repo
+            
+            # Fetch merged PRs for this repository
+            url = f"https://api.github.com/repos/{repo_path}/pulls"
+            params = {
+                'state': 'closed',
+                'sort': 'updated',
+                'direction': 'desc',
+                'per_page': 100
+            }
+            
+            response = requests.get(url, headers=headers, params=params)
+            if response.status_code != 200:
+                continue
+                
+            prs = response.json()
+            
+            # Filter PRs merged in our date range
+            for pr in prs:
+                if pr.get('merged_at'):
+                    merged_date = pr['merged_at'][:10]  # Extract YYYY-MM-DD
+                    if start_date <= merged_date <= end_date:
+                        all_prs.append(pr)
+        
+        # Compute lead time statistics
+        stats = compute_pr_lead_time_stats(all_prs, min_lines_changed)
+        
+        if stats['count'] == 0:
+            return f"\n\n### 🚀 Delivery • PR Lead Time\n\n*No merged PRs with ≥{min_lines_changed} lines changed found in this period*\n"
+        
+        # Build the section
+        section = f"\n\n### 🚀 Delivery • PR Lead Time\n\n"
+        section += f"**Merged PRs Analyzed:** {stats['count']} PRs (≥{min_lines_changed} lines changed)\n\n"
+        
+        # Summary statistics
+        avg_formatted = format_lead_time_duration(stats['avg'])
+        median_formatted = format_lead_time_duration(stats['median']) 
+        p90_formatted = format_lead_time_duration(stats['p90'])
+        
+        section += f"**📊 Lead Time Summary**\n"
+        section += f"- **Average:** {avg_formatted}\n"
+        section += f"- **Median:** {median_formatted}\n" 
+        section += f"- **90th Percentile:** {p90_formatted}\n\n"
+        
+        # Top 5 fastest PRs
+        if stats['fastest']:
+            section += f"#### ⚡ Top 5 Fastest PRs\n\n"
+            section += "| PR | Author | Lead Time | Lines | Title |\n"
+            section += "|-------|--------|-----------|-------|-------|\n"
+            
+            for pr in stats['fastest']:
+                lead_time_str = format_lead_time_duration(pr['lead_time_hours'])
+                lines_changed = pr['additions'] + pr['deletions']
+                title = pr['title'][:50] + "..." if len(pr['title']) > 50 else pr['title']
+                section += f"| [#{pr['number']}]({pr['url']}) | {pr['author']} | {lead_time_str} | {lines_changed} | {title} |\n"
+            section += "\n"
+        
+        # Top 5 slowest PRs  
+        if stats['slowest']:
+            section += f"#### 🐌 Top 5 Slowest PRs\n\n"
+            section += "| PR | Author | Lead Time | Lines | Title |\n"
+            section += "|-------|--------|-----------|-------|-------|\n"
+            
+            for pr in stats['slowest']:
+                lead_time_str = format_lead_time_duration(pr['lead_time_hours'])
+                lines_changed = pr['additions'] + pr['deletions']
+                title = pr['title'][:50] + "..." if len(pr['title']) > 50 else pr['title']
+                section += f"| [#{pr['number']}]({pr['url']}) | {pr['author']} | {lead_time_str} | {lines_changed} | {title} |\n"
+            section += "\n"
+        
+        return section
+        
+    except Exception as e:
+        return f"\n\n### 🚀 Delivery • PR Lead Time\n\n*Error computing PR lead time analysis: {e}*\n"
+
+
 def main():
     """Main function to generate GitHub weekly summary report."""
     # Parse command line arguments for dates and optional config file
@@ -515,11 +630,14 @@ def main():
         # Generate the report
         report_content = summary_generator.generate_report(start_date, end_date, config_file)
         
+        # Add PR lead time analysis if enabled
+        if enable_pr_lead_time:
+            pr_lead_time_section = generate_pr_lead_time_analysis(config, start_date, end_date)
+            report_content += pr_lead_time_section
+        
         # TODO: Future GitHub metrics sections (Phase 2+)
-        # if enable_pr_lead_time:
-        #     report_content += generate_pr_lead_time_analysis(prs, start_date, end_date)
         # if enable_review_depth:
-        #     report_content += generate_review_depth_analysis(prs, start_date, end_date)
+        #     report_content += generate_review_depth_analysis(config, start_date, end_date)
         
         # Append active configuration block
         config_block = render_active_config(config)
