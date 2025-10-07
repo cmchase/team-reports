@@ -410,7 +410,7 @@ class GitHubQuarterlySummary:
         
         return "\n".join(report)
 
-    def generate_quarterly_summary(self, year: int, quarter: int) -> str:
+    def generate_quarterly_summary(self, year: int, quarter: int) -> Tuple[str, Dict[str, List[Dict]]]:
         """Generate the complete GitHub quarterly summary."""
         print("🚀 Initializing GitHub API connection...")
         
@@ -443,13 +443,17 @@ class GitHubQuarterlySummary:
         print(f"📊 Found {total_prs} pull requests, {total_commits} commits, {total_issues} issues")
         
         if total_prs == 0 and total_commits == 0 and total_issues == 0:
-            return f"No GitHub activity found for Q{quarter} {year} ({start_date} to {end_date})"
+            report = f"No GitHub activity found for Q{quarter} {year} ({start_date} to {end_date})"
+            return report, {}
         
         # Analyze contributor performance
         performance = self.analyze_contributor_performance(all_data)
         
         # Generate the complete report
-        return self.generate_quarterly_report(performance, year, quarter, start_date, end_date)
+        report = self.generate_quarterly_report(performance, year, quarter, start_date, end_date)
+        
+        # Return both the report and the fetched PR data for optimization
+        return report, all_data['pull_requests']
 
 
 def parse_quarter_args() -> Tuple[int, int]:
@@ -471,7 +475,8 @@ def parse_quarter_args() -> Tuple[int, int]:
         return year, quarter
 
 
-def generate_quarterly_pr_lead_time_analysis(config: Dict[str, Any], year: int, quarter: int) -> str:
+def generate_quarterly_pr_lead_time_analysis(config: Dict[str, Any], year: int, quarter: int, 
+                                          all_prs_data: Optional[Dict[str, List[Dict]]] = None) -> str:
     """
     Generate quarterly PR lead time analysis with trend insights.
     
@@ -502,59 +507,72 @@ def generate_quarterly_pr_lead_time_analysis(config: Dict[str, Any], year: int, 
         
         print(f"🚀 Computing quarterly PR lead time analysis...")
         
-        # Collect all merged PRs from the quarter
-        all_prs = []
-        
-        # Create temporary GitHub client to fetch PR data
-        headers = {
-            'Authorization': f'token {github_token}',
-            'Accept': 'application/vnd.github.v3+json'
-        }
-        
-        for repo in repositories:
-            repo_path = f"{github_org}/{repo}" if github_org else repo
+        # Use pre-fetched data if available, otherwise fetch from API
+        if all_prs_data:
+            print("✅ Using pre-fetched PR data (optimized)")
+            # Collect all merged PRs from pre-fetched data
+            all_prs = []
+            for repo_path, prs in all_prs_data.items():
+                for pr in prs:
+                    if pr.get('merged_at'):
+                        merged_date = pr['merged_at'][:10]  # Extract YYYY-MM-DD
+                        if start_date <= merged_date <= end_date:
+                            all_prs.append(pr)
+        else:
+            print("⚠️  Making fresh API calls (not optimized)")
+            # Collect all merged PRs from the quarter (fallback to API calls)
+            all_prs = []
             
-            # Fetch merged PRs for this repository
-            url = f"https://api.github.com/repos/{repo_path}/pulls"
-            params = {
-                'state': 'closed',
-                'sort': 'updated',
-                'direction': 'desc',
-                'per_page': 100
+            # Create temporary GitHub client to fetch PR data
+            headers = {
+                'Authorization': f'token {github_token}',
+                'Accept': 'application/vnd.github.v3+json'
             }
             
-            response = requests.get(url, headers=headers, params=params)
-            if response.status_code != 200:
-                continue
+            for repo in repositories:
+                repo_path = f"{github_org}/{repo}" if github_org else repo
                 
-            prs = response.json()
-            
-            # Filter PRs merged in our quarter date range and fetch detailed info
-            for pr in prs:
-                if pr.get('merged_at'):
-                    merged_date = pr['merged_at'][:10]  # Extract YYYY-MM-DD
-                    if start_date <= merged_date <= end_date:
-                        # Fetch detailed PR info to get additions/deletions
-                        try:
-                            detail_url = f"https://api.github.com/repos/{repo_path}/pulls/{pr['number']}"
-                            detail_response = requests.get(detail_url, headers=headers)
-                            if detail_response.status_code == 200:
-                                detail_data = detail_response.json()
-                                pr['additions'] = detail_data.get('additions', 0)
-                                pr['deletions'] = detail_data.get('deletions', 0)
-                                pr['changed_files'] = detail_data.get('changed_files', 0)
-                            else:
+                # Fetch merged PRs for this repository
+                url = f"https://api.github.com/repos/{repo_path}/pulls"
+                params = {
+                    'state': 'closed',
+                    'sort': 'updated',
+                    'direction': 'desc',
+                    'per_page': 100
+                }
+                
+                response = requests.get(url, headers=headers, params=params)
+                if response.status_code != 200:
+                    continue
+                    
+                prs = response.json()
+                
+                # Filter PRs merged in our quarter date range and fetch detailed info
+                for pr in prs:
+                    if pr.get('merged_at'):
+                        merged_date = pr['merged_at'][:10]  # Extract YYYY-MM-DD
+                        if start_date <= merged_date <= end_date:
+                            # Fetch detailed PR info to get additions/deletions
+                            try:
+                                detail_url = f"https://api.github.com/repos/{repo_path}/pulls/{pr['number']}"
+                                detail_response = requests.get(detail_url, headers=headers)
+                                if detail_response.status_code == 200:
+                                    detail_data = detail_response.json()
+                                    pr['additions'] = detail_data.get('additions', 0)
+                                    pr['deletions'] = detail_data.get('deletions', 0)
+                                    pr['changed_files'] = detail_data.get('changed_files', 0)
+                                else:
+                                    # Fallback if we can't get details
+                                    pr['additions'] = 0
+                                    pr['deletions'] = 0
+                                    pr['changed_files'] = 0
+                            except Exception:
                                 # Fallback if we can't get details
                                 pr['additions'] = 0
                                 pr['deletions'] = 0
                                 pr['changed_files'] = 0
-                        except Exception:
-                            # Fallback if we can't get details
-                            pr['additions'] = 0
-                            pr['deletions'] = 0
-                            pr['changed_files'] = 0
-                        
-                        all_prs.append(pr)
+                            
+                            all_prs.append(pr)
         
         # Compute overall quarter statistics
         quarter_stats = compute_pr_lead_time_stats(all_prs, min_lines_changed)
@@ -701,11 +719,11 @@ def main():
         summary_generator = GitHubQuarterlySummary(config_file)
         
         # Generate the complete quarterly report
-        report = summary_generator.generate_quarterly_summary(year, quarter)
+        report, pr_data = summary_generator.generate_quarterly_summary(year, quarter)
         
         # Add quarterly PR lead time analysis if enabled
         if enable_pr_lead_time:
-            pr_lead_time_section = generate_quarterly_pr_lead_time_analysis(config, year, quarter)
+            pr_lead_time_section = generate_quarterly_pr_lead_time_analysis(config, year, quarter, pr_data)
             report += pr_lead_time_section
         
         # TODO: Future quarterly GitHub metrics sections (Phase 2+)

@@ -433,7 +433,7 @@ class GitHubWeeklySummary:
 
         return section
 
-    def generate_report(self, start_date: str, end_date: str, config_file: str = 'config/github_config.yaml') -> str:
+    def generate_report(self, start_date: str, end_date: str, config_file: str = 'config/github_config.yaml') -> Tuple[str, Dict[str, List[Dict]]]:
         """Generate the complete weekly GitHub summary report."""
         print(f"\n🚀 Generating GitHub Weekly Summary Report: {start_date} to {end_date}")
         print(f"📄 Using configuration: {config_file}")
@@ -461,10 +461,12 @@ class GitHubWeeklySummary:
         # Add contributor details
         report_lines.extend(self.generate_contributor_details(performance))
         
-        return '\n'.join(report_lines)
+        # Return both the report and PR data for optimization
+        return '\n'.join(report_lines), all_data['pull_requests']
 
 
-def generate_pr_lead_time_analysis(config: Dict[str, Any], start_date: str, end_date: str) -> str:
+def generate_pr_lead_time_analysis(config: Dict[str, Any], start_date: str, end_date: str, 
+                                  all_prs_data: Optional[Dict[str, List[Dict]]] = None) -> str:
     """
     Generate PR lead time analysis section for weekly report.
     
@@ -492,59 +494,72 @@ def generate_pr_lead_time_analysis(config: Dict[str, Any], start_date: str, end_
         
         print(f"🚀 Computing PR lead time analysis...")
         
-        # Collect all merged PRs from the period
-        all_prs = []
-        
-        # Create temporary GitHub client to fetch PR data
-        headers = {
-            'Authorization': f'token {github_token}',
-            'Accept': 'application/vnd.github.v3+json'
-        }
-        
-        for repo in repositories:
-            repo_path = f"{github_org}/{repo}" if github_org else repo
+        # Use pre-fetched data if available, otherwise fetch from API
+        if all_prs_data:
+            print("✅ Using pre-fetched PR data (optimized)")
+            # Collect all merged PRs from pre-fetched data
+            all_prs = []
+            for repo_name, prs in all_prs_data.items():
+                for pr in prs:
+                    if pr.get('merged_at'):
+                        merged_date = pr['merged_at'][:10]  # Extract YYYY-MM-DD
+                        if start_date <= merged_date <= end_date:
+                            all_prs.append(pr)
+        else:
+            print("⚠️  Making fresh API calls (not optimized)")
+            # Collect all merged PRs from the period (fallback to API calls)
+            all_prs = []
             
-            # Fetch merged PRs for this repository
-            url = f"https://api.github.com/repos/{repo_path}/pulls"
-            params = {
-                'state': 'closed',
-                'sort': 'updated',
-                'direction': 'desc',
-                'per_page': 100
+            # Create temporary GitHub client to fetch PR data
+            headers = {
+                'Authorization': f'token {github_token}',
+                'Accept': 'application/vnd.github.v3+json'
             }
             
-            response = requests.get(url, headers=headers, params=params)
-            if response.status_code != 200:
-                continue
+            for repo in repositories:
+                repo_path = f"{github_org}/{repo}" if github_org else repo
                 
-            prs = response.json()
-            
-            # Filter PRs merged in our date range and fetch detailed info
-            for pr in prs:
-                if pr.get('merged_at'):
-                    merged_date = pr['merged_at'][:10]  # Extract YYYY-MM-DD
-                    if start_date <= merged_date <= end_date:
-                        # Fetch detailed PR info to get additions/deletions
-                        try:
-                            detail_url = f"https://api.github.com/repos/{repo_path}/pulls/{pr['number']}"
-                            detail_response = requests.get(detail_url, headers=headers)
-                            if detail_response.status_code == 200:
-                                detail_data = detail_response.json()
-                                pr['additions'] = detail_data.get('additions', 0)
-                                pr['deletions'] = detail_data.get('deletions', 0)
-                                pr['changed_files'] = detail_data.get('changed_files', 0)
-                            else:
+                # Fetch merged PRs for this repository
+                url = f"https://api.github.com/repos/{repo_path}/pulls"
+                params = {
+                    'state': 'closed',
+                    'sort': 'updated',
+                    'direction': 'desc',
+                    'per_page': 100
+                }
+                
+                response = requests.get(url, headers=headers, params=params)
+                if response.status_code != 200:
+                    continue
+                    
+                prs = response.json()
+                
+                # Filter PRs merged in our date range and fetch detailed info
+                for pr in prs:
+                    if pr.get('merged_at'):
+                        merged_date = pr['merged_at'][:10]  # Extract YYYY-MM-DD
+                        if start_date <= merged_date <= end_date:
+                            # Fetch detailed PR info to get additions/deletions
+                            try:
+                                detail_url = f"https://api.github.com/repos/{repo_path}/pulls/{pr['number']}"
+                                detail_response = requests.get(detail_url, headers=headers)
+                                if detail_response.status_code == 200:
+                                    detail_data = detail_response.json()
+                                    pr['additions'] = detail_data.get('additions', 0)
+                                    pr['deletions'] = detail_data.get('deletions', 0)
+                                    pr['changed_files'] = detail_data.get('changed_files', 0)
+                                else:
+                                    # Fallback if we can't get details
+                                    pr['additions'] = 0
+                                    pr['deletions'] = 0
+                                    pr['changed_files'] = 0
+                            except Exception:
                                 # Fallback if we can't get details
                                 pr['additions'] = 0
                                 pr['deletions'] = 0
                                 pr['changed_files'] = 0
-                        except Exception:
-                            # Fallback if we can't get details
-                            pr['additions'] = 0
-                            pr['deletions'] = 0
-                            pr['changed_files'] = 0
-                        
-                        all_prs.append(pr)
+                            
+                            all_prs.append(pr)
         
         # Compute lead time statistics
         stats = compute_pr_lead_time_stats(all_prs, min_lines_changed)
@@ -635,11 +650,11 @@ def main():
         summary_generator = GitHubWeeklySummary(config_file)
         
         # Generate the report
-        report_content = summary_generator.generate_report(start_date, end_date, config_file)
+        report_content, pr_data = summary_generator.generate_report(start_date, end_date, config_file)
         
         # Add PR lead time analysis if enabled
         if enable_pr_lead_time:
-            pr_lead_time_section = generate_pr_lead_time_analysis(config, start_date, end_date)
+            pr_lead_time_section = generate_pr_lead_time_analysis(config, start_date, end_date, pr_data)
             report_content += pr_lead_time_section
         
         # TODO: Future GitHub metrics sections (Phase 2+)
