@@ -14,7 +14,7 @@ Usage:
 
 import sys
 import os
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from collections import defaultdict, Counter
 from datetime import datetime
 
@@ -315,8 +315,8 @@ class QuarterlyTeamSummary(JiraSummaryBase):
         # Join all report sections into final markdown string
         return "\n".join(report)
     
-    def generate_quarterly_summary(self, year: int, quarter: int) -> str:
-        """Generate the complete quarterly summary by orchestrating all data collection and analysis."""
+    def generate_quarterly_summary(self, year: int, quarter: int) -> tuple[str, List[Any]]:
+        """Generate the complete quarterly summary and return ticket data for reuse."""
         # Initialize JIRA connection (must be done before any ticket operations)
         self.initialize()
         
@@ -328,13 +328,14 @@ class QuarterlyTeamSummary(JiraSummaryBase):
         
         # Handle case where no tickets are found (avoid empty reports)
         if not tickets:
-            return f"No tickets found for Q{quarter} {year} ({start_date} to {end_date})"
+            return f"No tickets found for Q{quarter} {year} ({start_date} to {end_date})", []
         
         # Analyze contributor performance across all tickets
         performance = self.analyze_contributor_performance(tickets)
         
         # Generate the complete formatted report using all collected performance data
-        return self.generate_quarterly_report(performance, year, quarter, start_date, end_date)
+        report = self.generate_quarterly_report(performance, year, quarter, start_date, end_date)
+        return report, tickets
 
 
 def parse_quarter_args() -> Tuple[int, int]:
@@ -402,12 +403,27 @@ def main():
         summary_generator = QuarterlyTeamSummary(config_file)
         
         # Generate the complete quarterly report
-        report = summary_generator.generate_quarterly_summary(year, quarter)
+        report, tickets = summary_generator.generate_quarterly_summary(year, quarter)
         
-        # Add quarterly cycle time analysis if enabled
+        # Add quarterly cycle time analysis if enabled (using shared data)
         if enable_cycle_time:
+            print("🔄 Pre-fetching tickets with changelog for quarterly cycle time analysis...")
+            # Calculate the exact date range for the specified quarter
+            from utils.date import get_quarter_range
+            start_date, end_date = get_quarter_range(year, quarter)
+            
+            # Build JQL and fetch tickets with changelog once
+            from utils.jira import build_jql_with_dates
+            base_jql = config.get('base_jql', '')
+            jql = build_jql_with_dates(base_jql, start_date, end_date, config, 'all')
+            tickets_with_changelog = summary_generator.jira_client.fetch_tickets_with_changelog(jql)
+            
             print("🔄 Computing quarterly cycle time trends...")
-            cycle_time_section = generate_quarterly_cycle_time_analysis(config, year, quarter)
+            cycle_time_section = generate_quarterly_cycle_time_analysis(
+                config, year, quarter,
+                jira_client=summary_generator.jira_client.jira_client,
+                tickets_with_changelog=tickets_with_changelog
+            )
             report += cycle_time_section
         
         # TODO: Future quarterly metrics sections (Phase 2+)
@@ -438,7 +454,9 @@ def main():
         sys.exit(1)
 
 
-def generate_quarterly_cycle_time_analysis(config: Dict[str, Any], year: int, quarter: int) -> str:
+def generate_quarterly_cycle_time_analysis(config: Dict[str, Any], year: int, quarter: int,
+                                         jira_client: Any = None,
+                                         tickets_with_changelog: Optional[List[Any]] = None) -> str:
     """
     Generate quarterly cycle time analysis with trends.
     
@@ -446,26 +464,35 @@ def generate_quarterly_cycle_time_analysis(config: Dict[str, Any], year: int, qu
         config: Configuration dictionary with Jira settings
         year: Year for the quarter
         quarter: Quarter number (1-4)
+        jira_client: Optional Jira client (avoids redundant initialization)
+        tickets_with_changelog: Optional pre-fetched tickets with changelog (avoids redundant API calls)
         
     Returns:
         str: Markdown section with quarterly cycle time analysis
     """
     try:
-        # Initialize Jira client
-        jira_client = initialize_jira_client()
-        
-        # Get quarter date range
-        from utils.date import get_quarter_range
-        start_date, end_date = get_quarter_range(year, quarter)
-        
-        # Build JQL for all tickets in the quarter
-        from utils.jira import build_jql_with_dates
-        base_jql = config.get('base_jql', '')
-        jql = build_jql_with_dates(base_jql, start_date, end_date, config, 'all')
-        
-        # Fetch tickets with changelog for cycle time calculation
-        max_results = config.get('report_settings', {}).get('max_results', 200)
-        tickets = fetch_tickets_with_changelog(jira_client, jql, max_results)
+        # Use pre-fetched tickets if available, otherwise fetch fresh
+        if tickets_with_changelog is not None:
+            print("✅ Using pre-fetched tickets with changelog (optimized)")
+            tickets = tickets_with_changelog
+        else:
+            print("⚠️  Making fresh API calls for quarterly cycle time analysis (not optimized)")
+            # Initialize Jira client if not provided
+            if jira_client is None:
+                jira_client = initialize_jira_client()
+            
+            # Get quarter date range
+            from utils.date import get_quarter_range
+            start_date, end_date = get_quarter_range(year, quarter)
+            
+            # Build JQL for all tickets in the quarter
+            from utils.jira import build_jql_with_dates
+            base_jql = config.get('base_jql', '')
+            jql = build_jql_with_dates(base_jql, start_date, end_date, config, 'all')
+            
+            # Fetch tickets with changelog for cycle time calculation
+            max_results = config.get('report_settings', {}).get('max_results', 200)
+            tickets = fetch_tickets_with_changelog(jira_client, jql, max_results)
         
         if not tickets:
             return f"\n\n### ⏱️ Flow • Quarterly Cycle Time Trends\n\n*No tickets found for Q{quarter} {year} cycle time analysis.*\n"

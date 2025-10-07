@@ -19,7 +19,7 @@ Examples:
 
 import sys
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from collections import defaultdict
 
 # Add current directory to path for imports
@@ -80,15 +80,15 @@ class WeeklyTeamSummary(JiraSummaryBase):
             self.config  # Pass config for categorization flag check
         )
         
-    def generate_weekly_summary(self, start_date: str, end_date: str) -> str:
-        """Generate the complete weekly summary"""
+    def generate_weekly_summary(self, start_date: str, end_date: str) -> tuple[str, List[Any]]:
+        """Generate the complete weekly summary and return ticket data for reuse"""
         self.initialize()
         
         # Fetch tickets
         tickets = self.fetch_tickets(start_date, end_date)
         
         if not tickets:
-            return f"No tickets found for the period {start_date} to {end_date}"
+            return f"No tickets found for the period {start_date} to {end_date}", []
             
         # Categorize tickets
         categorized_tickets = defaultdict(list)
@@ -97,10 +97,13 @@ class WeeklyTeamSummary(JiraSummaryBase):
             categorized_tickets[category].append(ticket)
             
         # Generate report
-        return self.generate_summary_report(categorized_tickets, start_date, end_date)
+        report = self.generate_summary_report(categorized_tickets, start_date, end_date)
+        return report, tickets
         
 
-def generate_wip_analysis(config: Dict[str, Any]) -> str:
+def generate_wip_analysis(config: Dict[str, Any], 
+                         jira_client: Any = None, 
+                         active_tickets: Optional[List[Any]] = None) -> str:
     """
     Generate WIP (Work in Progress) analysis section for weekly report.
     
@@ -108,35 +111,44 @@ def generate_wip_analysis(config: Dict[str, Any]) -> str:
     
     Args:
         config: Configuration dictionary with Jira settings and thresholds
+        jira_client: Optional Jira client (avoids redundant initialization)
+        active_tickets: Optional pre-fetched active tickets (avoids redundant API calls)
         
     Returns:
         str: Markdown section with WIP analysis
     """
     try:
-        # Initialize Jira client
-        jira_client = initialize_jira_client()
-        
         # Get active states from config
         active_states = config.get('states', {}).get('active', ['In Progress', 'Review'])
         
         # Get WIP threshold per engineer
         wip_threshold = config.get('thresholds', {}).get('wip', {}).get('max_per_engineer', 3)
         
-        # Build JQL for current active tickets
-        base_jql = config.get('base_jql', '')
-        
-        # Create JQL to find all currently active tickets
-        active_states_jql = ','.join([f'"{state}"' for state in active_states])
-        if base_jql:
-            jql = f"({base_jql}) AND status in ({active_states_jql})"
+        # Use pre-fetched tickets if available, otherwise fetch fresh
+        if active_tickets is not None:
+            print("✅ Using pre-fetched active tickets (optimized)")
+            tickets = active_tickets
         else:
-            jql = f"status in ({active_states_jql})"
+            print("⚠️  Making fresh API calls for WIP analysis (not optimized)")
+            # Initialize Jira client if not provided
+            if jira_client is None:
+                jira_client = initialize_jira_client()
             
-        # Fetch current active tickets
-        max_results = config.get('report_settings', {}).get('max_results', 200)  
-        
-        print(f"🔍 Fetching current WIP tickets with JQL: {jql}")
-        tickets = jira_client.search_issues(jql, maxResults=max_results, expand='changelog')
+            # Build JQL for current active tickets
+            base_jql = config.get('base_jql', '')
+            
+            # Create JQL to find all currently active tickets
+            active_states_jql = ','.join([f'"{state}"' for state in active_states])
+            if base_jql:
+                jql = f"({base_jql}) AND status in ({active_states_jql})"
+            else:
+                jql = f"status in ({active_states_jql})"
+                
+            # Fetch current active tickets
+            max_results = config.get('report_settings', {}).get('max_results', 200)  
+            
+            print(f"🔍 Fetching current WIP tickets with JQL: {jql}")
+            tickets = jira_client.search_issues(jql, maxResults=max_results, expand='changelog')
         
         if not tickets:
             return f"\n\n### 📊 Flow • Work in Progress (WIP)\n\n*No active tickets found in states: {', '.join(active_states)}*\n"
@@ -194,7 +206,9 @@ def generate_wip_analysis(config: Dict[str, Any]) -> str:
         return f"\n\n### 📊 Flow • Work in Progress (WIP)\n\n*Error computing WIP analysis: {e}*\n"
 
 
-def generate_cycle_time_analysis(config: Dict[str, Any], start_date: str, end_date: str) -> str:
+def generate_cycle_time_analysis(config: Dict[str, Any], start_date: str, end_date: str,
+                               jira_client: Any = None,
+                               tickets_with_changelog: Optional[List[Any]] = None) -> str:
     """
     Generate cycle time analysis section for weekly report.
     
@@ -202,22 +216,31 @@ def generate_cycle_time_analysis(config: Dict[str, Any], start_date: str, end_da
         config: Configuration dictionary with Jira settings
         start_date: Start date in YYYY-MM-DD format  
         end_date: End date in YYYY-MM-DD format
+        jira_client: Optional Jira client (avoids redundant initialization)
+        tickets_with_changelog: Optional pre-fetched tickets with changelog (avoids redundant API calls)
         
     Returns:
         str: Markdown section with cycle time analysis
     """
     try:
-        # Initialize Jira client
-        jira_client = initialize_jira_client()
-        
-        # Build JQL for all tickets (not just completed ones) to get full cycle data
-        from utils.jira import build_jql_with_dates
-        base_jql = config.get('base_jql', '')
-        jql = build_jql_with_dates(base_jql, start_date, end_date, config, 'all')
-        
-        # Fetch tickets with changelog for cycle time calculation
-        max_results = config.get('report_settings', {}).get('max_results', 200)
-        tickets = fetch_tickets_with_changelog(jira_client, jql, max_results)
+        # Use pre-fetched tickets if available, otherwise fetch fresh
+        if tickets_with_changelog is not None:
+            print("✅ Using pre-fetched tickets with changelog (optimized)")
+            tickets = tickets_with_changelog
+        else:
+            print("⚠️  Making fresh API calls for cycle time analysis (not optimized)")
+            # Initialize Jira client if not provided
+            if jira_client is None:
+                jira_client = initialize_jira_client()
+            
+            # Build JQL for all tickets (not just completed ones) to get full cycle data
+            from utils.jira import build_jql_with_dates
+            base_jql = config.get('base_jql', '')
+            jql = build_jql_with_dates(base_jql, start_date, end_date, config, 'all')
+            
+            # Fetch tickets with changelog for cycle time calculation
+            max_results = config.get('report_settings', {}).get('max_results', 200)
+            tickets = fetch_tickets_with_changelog(jira_client, jql, max_results)
         
         if not tickets:
             return "\n\n### ⏱️ Flow • Cycle Time\n\n*No tickets found for cycle time analysis.*\n"
@@ -331,18 +354,46 @@ def main():
         enable_blocked_time = flag("metrics.flow.blocked_time")
         
         summary_generator = WeeklyTeamSummary(config_file)
-        report = summary_generator.generate_weekly_summary(start_date, end_date)
+        report, tickets = summary_generator.generate_weekly_summary(start_date, end_date)
         
-        # Add cycle time analysis if enabled
+        # Pre-fetch specialized data for flow analyses (optimized approach)
+        tickets_with_changelog = None
+        active_tickets = None
+        
+        if enable_cycle_time or enable_wip:
+            # Initialize shared client for flow analyses
+            summary_generator.initialize()  # Ensure client is ready
+            
+            if enable_cycle_time:
+                print("🔄 Pre-fetching tickets with changelog for cycle time analysis...")
+                from utils.jira import build_jql_with_dates
+                base_jql = config.get('base_jql', '')
+                jql = build_jql_with_dates(base_jql, start_date, end_date, config, 'all')
+                tickets_with_changelog = summary_generator.jira_client.fetch_tickets_with_changelog(jql)
+            
+            if enable_wip:
+                print("📊 Pre-fetching active tickets for WIP analysis...")
+                active_states = config.get('states', {}).get('active', ['In Progress', 'Review'])
+                active_tickets = summary_generator.jira_client.fetch_active_tickets(active_states)
+        
+        # Add cycle time analysis if enabled (using shared data)
         if enable_cycle_time:
             print("🔄 Computing weekly cycle time analysis...")
-            cycle_time_section = generate_cycle_time_analysis(config, start_date, end_date)
+            cycle_time_section = generate_cycle_time_analysis(
+                config, start_date, end_date,
+                jira_client=summary_generator.jira_client.jira_client,
+                tickets_with_changelog=tickets_with_changelog
+            )
             report += cycle_time_section
         
-        # Add WIP analysis if enabled
+        # Add WIP analysis if enabled (using shared data)
         if enable_wip:
             print("📊 Computing current WIP analysis...")
-            wip_section = generate_wip_analysis(config)
+            wip_section = generate_wip_analysis(
+                config,
+                jira_client=summary_generator.jira_client.jira_client,
+                active_tickets=active_tickets
+            )
             report += wip_section
         
         # TODO: Future metrics sections (Phase 2+)

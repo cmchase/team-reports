@@ -46,6 +46,48 @@ class JiraApiClient:
         default_filter = self.config.get('report_settings', {}).get('default_status_filter', 'completed')
         return fetch_tickets_for_date_range(self.jira_client, self.base_jql, start_date, end_date, self.config, default_filter)
     
+    def fetch_tickets_with_changelog(self, jql: str, max_results: Optional[int] = None) -> List[Any]:
+        """Fetch tickets with changelog data for cycle time analysis."""
+        if max_results is None:
+            max_results = self.config.get('report_settings', {}).get('max_results', 200)
+        
+        print(f"🔍 Executing JQL query with changelog...")
+        print(f"📝 JQL: {jql}")
+        
+        try:
+            issues = self.jira_client.search_issues(
+                jql, 
+                maxResults=max_results,
+                expand='changelog'  # Key for getting status history
+            )
+            print(f"📊 Found {len(issues)} tickets with changelog data")
+            return issues
+        except Exception as e:
+            print(f"❌ Error fetching tickets with changelog: {e}")
+            return []
+    
+    def fetch_active_tickets(self, active_states: List[str], max_results: Optional[int] = None) -> List[Any]:
+        """Fetch current active/WIP tickets for flow analysis."""
+        if max_results is None:
+            max_results = self.config.get('report_settings', {}).get('max_results', 200)
+        
+        # Build JQL for current active tickets
+        active_states_jql = ','.join([f'"{state}"' for state in active_states])
+        if self.base_jql:
+            jql = f"({self.base_jql}) AND status in ({active_states_jql})"
+        else:
+            jql = f"status in ({active_states_jql})"
+            
+        print(f"🔍 Fetching current WIP tickets with JQL: {jql}")
+        
+        try:
+            issues = self.jira_client.search_issues(jql, maxResults=max_results, expand='changelog')
+            print(f"📊 Found {len(issues)} active tickets")
+            return issues
+        except Exception as e:
+            print(f"❌ Error fetching active tickets: {e}")
+            return []
+
     def get_server_url(self) -> str:
         """Get the Jira server URL for link generation."""
         return self.jira_client.server_url if self.jira_client else ""
