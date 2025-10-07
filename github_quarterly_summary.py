@@ -28,6 +28,7 @@ from dotenv import load_dotenv
 from utils.date import get_current_quarter, get_quarter_range, parse_quarter_from_date
 from utils.config import load_config, get_config
 from utils.report import ensure_reports_directory, save_report, generate_filename, render_active_config
+from utils.github import compute_pr_lead_time_stats, format_lead_time_duration
 
 # Load environment variables
 load_dotenv()
@@ -54,8 +55,8 @@ class GitHubQuarterlySummary:
         }
 
     def _load_config(self, config_file: str) -> Dict[str, Any]:
-        """Load configuration from YAML file."""
-        return load_config(config_file)
+        """Load configuration from YAML file with defaults and environment overrides."""
+        return get_config([config_file])
 
     def _github_request(self, endpoint: str, params: Optional[Dict] = None) -> List[Dict]:
         """Make a request to GitHub API with pagination support."""
@@ -481,6 +482,198 @@ def parse_quarter_args() -> Tuple[int, int]:
         return year, quarter
 
 
+def generate_quarterly_pr_lead_time_analysis(config: Dict[str, Any], year: int, quarter: int) -> str:
+    """
+    Generate quarterly PR lead time analysis with trend insights.
+    
+    Args:
+        config: Configuration dictionary with GitHub settings
+        year: Year for the quarter
+        quarter: Quarter number (1-4)
+        
+    Returns:
+        str: Markdown section with quarterly PR lead time analysis
+    """
+    try:
+        # Get quarter date range
+        start_date, end_date = get_quarter_range(year, quarter)
+        
+        # Initialize GitHub client
+        github_token = os.getenv('GITHUB_TOKEN')
+        if not github_token:
+            return "\n\n### 🚀 Delivery • Quarterly PR Lead Time\n\n*Error: GITHUB_TOKEN not configured*\n"
+        
+        # Get configuration values
+        repositories = config.get('repositories', [])
+        github_org = config.get('github_org', config.get('github', {}).get('org', ''))
+        min_lines_changed = config.get('thresholds', {}).get('delivery', {}).get('min_lines_changed', 5)
+        
+        if not repositories:
+            return "\n\n### 🚀 Delivery • Quarterly PR Lead Time\n\n*No repositories configured for analysis*\n"
+        
+        print(f"🚀 Computing quarterly PR lead time analysis...")
+        
+        # Collect all merged PRs from the quarter
+        all_prs = []
+        
+        # Create temporary GitHub client to fetch PR data
+        headers = {
+            'Authorization': f'token {github_token}',
+            'Accept': 'application/vnd.github.v3+json'
+        }
+        
+        for repo in repositories:
+            repo_path = f"{github_org}/{repo}" if github_org else repo
+            
+            # Fetch merged PRs for this repository
+            url = f"https://api.github.com/repos/{repo_path}/pulls"
+            params = {
+                'state': 'closed',
+                'sort': 'updated',
+                'direction': 'desc',
+                'per_page': 100
+            }
+            
+            response = requests.get(url, headers=headers, params=params)
+            if response.status_code != 200:
+                continue
+                
+            prs = response.json()
+            
+            # Filter PRs merged in our quarter date range and fetch detailed info
+            for pr in prs:
+                if pr.get('merged_at'):
+                    merged_date = pr['merged_at'][:10]  # Extract YYYY-MM-DD
+                    if start_date <= merged_date <= end_date:
+                        # Fetch detailed PR info to get additions/deletions
+                        try:
+                            detail_url = f"https://api.github.com/repos/{repo_path}/pulls/{pr['number']}"
+                            detail_response = requests.get(detail_url, headers=headers)
+                            if detail_response.status_code == 200:
+                                detail_data = detail_response.json()
+                                pr['additions'] = detail_data.get('additions', 0)
+                                pr['deletions'] = detail_data.get('deletions', 0)
+                                pr['changed_files'] = detail_data.get('changed_files', 0)
+                            else:
+                                # Fallback if we can't get details
+                                pr['additions'] = 0
+                                pr['deletions'] = 0
+                                pr['changed_files'] = 0
+                        except Exception:
+                            # Fallback if we can't get details
+                            pr['additions'] = 0
+                            pr['deletions'] = 0
+                            pr['changed_files'] = 0
+                        
+                        all_prs.append(pr)
+        
+        # Compute overall quarter statistics
+        quarter_stats = compute_pr_lead_time_stats(all_prs, min_lines_changed)
+        
+        if quarter_stats['count'] == 0:
+            return f"\n\n### 🚀 Delivery • Quarterly PR Lead Time\n\n*No merged PRs with ≥{min_lines_changed} lines changed found in Q{quarter} {year}*\n"
+        
+        # Build the section
+        section = f"\n\n### 🚀 Delivery • Quarterly PR Lead Time\n\n"
+        section += f"**Analysis Period:** Q{quarter} {year} ({start_date} to {end_date})\n"
+        section += f"**Merged PRs Analyzed:** {quarter_stats['count']} PRs (≥{min_lines_changed} lines changed)\n\n"
+        
+        # Quarter summary statistics
+        avg_formatted = format_lead_time_duration(quarter_stats['avg'])
+        median_formatted = format_lead_time_duration(quarter_stats['median']) 
+        p90_formatted = format_lead_time_duration(quarter_stats['p90'])
+        
+        section += f"**📊 Quarter Summary**\n"
+        section += f"- **Average Lead Time:** {avg_formatted}\n"
+        section += f"- **Median Lead Time:** {median_formatted}\n" 
+        section += f"- **90th Percentile:** {p90_formatted}\n\n"
+        
+        # Monthly breakdown for trend analysis (if we have enough data)
+        if quarter_stats['count'] >= 10:
+            section += f"**📈 Monthly Trend Analysis**\n"
+            
+            # Group PRs by month within the quarter
+            monthly_stats = {}
+            quarter_months = []
+            
+            # Determine which months are in this quarter
+            quarter_start_month = (quarter - 1) * 3 + 1
+            for month_offset in range(3):
+                month_num = quarter_start_month + month_offset
+                if month_num <= 12:
+                    quarter_months.append(month_num)
+            
+            for month in quarter_months:
+                month_prs = []
+                month_start = f"{year}-{month:02d}-01"
+                
+                # Find last day of month (simple approximation)
+                if month in [1, 3, 5, 7, 8, 10, 12]:
+                    last_day = 31
+                elif month in [4, 6, 9, 11]:
+                    last_day = 30
+                else:  # February
+                    last_day = 29 if year % 4 == 0 else 28
+                
+                month_end = f"{year}-{month:02d}-{last_day:02d}"
+                
+                for pr in all_prs:
+                    if pr.get('merged_at'):
+                        merged_date = pr['merged_at'][:10]
+                        if month_start <= merged_date <= month_end:
+                            month_prs.append(pr)
+                
+                if month_prs:
+                    month_stat = compute_pr_lead_time_stats(month_prs, min_lines_changed)
+                    if month_stat['count'] > 0:
+                        monthly_stats[month] = month_stat
+            
+            if monthly_stats:
+                section += "| Month | PRs | Median Lead Time | Trend |\n"
+                section += "|-------|-----|------------------|-------|\n"
+                
+                month_names = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
+                             7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
+                
+                prev_median = None
+                for month in sorted(monthly_stats.keys()):
+                    stats = monthly_stats[month]
+                    median_str = format_lead_time_duration(stats['median'])
+                    
+                    # Simple trend indicator
+                    trend = "—"
+                    if prev_median is not None:
+                        if stats['median'] < prev_median * 0.9:
+                            trend = "📉 Improving"
+                        elif stats['median'] > prev_median * 1.1:
+                            trend = "📈 Increasing"
+                        else:
+                            trend = "➡️ Stable"
+                    
+                    section += f"| {month_names[month]} | {stats['count']} | {median_str} | {trend} |\n"
+                    prev_median = stats['median']
+                
+                section += "\n"
+        
+        # Top performers (fastest PRs) 
+        if quarter_stats['fastest']:
+            section += f"#### ⚡ Quarter's Fastest PRs (Top 5)\n\n"
+            section += "| PR | Author | Lead Time | Lines | Title |\n"
+            section += "|-------|--------|-----------|-------|-------|\n"
+            
+            for pr in quarter_stats['fastest'][:5]:
+                lead_time_str = format_lead_time_duration(pr['lead_time_hours'])
+                lines_changed = pr['additions'] + pr['deletions']
+                title = pr['title'][:50] + "..." if len(pr['title']) > 50 else pr['title']
+                section += f"| [#{pr['number']}]({pr['url']}) | {pr['author']} | {lead_time_str} | {lines_changed} | {title} |\n"
+            section += "\n"
+        
+        return section
+        
+    except Exception as e:
+        return f"\n\n### 🚀 Delivery • Quarterly PR Lead Time\n\n*Error computing quarterly PR lead time analysis: {e}*\n"
+
+
 def main():
     """Main entry point for the GitHub quarterly summary generator."""
     try:
@@ -521,11 +714,14 @@ def main():
         # Generate the complete quarterly report
         report = summary_generator.generate_quarterly_summary(year, quarter)
         
+        # Add quarterly PR lead time analysis if enabled
+        if enable_pr_lead_time:
+            pr_lead_time_section = generate_quarterly_pr_lead_time_analysis(config, year, quarter)
+            report += pr_lead_time_section
+        
         # TODO: Future quarterly GitHub metrics sections (Phase 2+)
-        # if enable_pr_lead_time:
-        #     report += generate_quarterly_pr_lead_time_trends(prs, year, quarter)
         # if enable_review_depth:
-        #     report += generate_quarterly_review_depth_trends(prs, year, quarter)
+        #     report += generate_quarterly_review_depth_trends(config, year, quarter)
         
         # Append active configuration block
         config_block = render_active_config(config)

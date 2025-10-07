@@ -532,11 +532,31 @@ def generate_pr_lead_time_analysis(config: Dict[str, Any], start_date: str, end_
                 
             prs = response.json()
             
-            # Filter PRs merged in our date range
+            # Filter PRs merged in our date range and fetch detailed info
             for pr in prs:
                 if pr.get('merged_at'):
                     merged_date = pr['merged_at'][:10]  # Extract YYYY-MM-DD
                     if start_date <= merged_date <= end_date:
+                        # Fetch detailed PR info to get additions/deletions
+                        try:
+                            detail_url = f"https://api.github.com/repos/{repo_path}/pulls/{pr['number']}"
+                            detail_response = requests.get(detail_url, headers=headers)
+                            if detail_response.status_code == 200:
+                                detail_data = detail_response.json()
+                                pr['additions'] = detail_data.get('additions', 0)
+                                pr['deletions'] = detail_data.get('deletions', 0)
+                                pr['changed_files'] = detail_data.get('changed_files', 0)
+                            else:
+                                # Fallback if we can't get details
+                                pr['additions'] = 0
+                                pr['deletions'] = 0
+                                pr['changed_files'] = 0
+                        except Exception:
+                            # Fallback if we can't get details
+                            pr['additions'] = 0
+                            pr['deletions'] = 0
+                            pr['changed_files'] = 0
+                        
                         all_prs.append(pr)
         
         # Compute lead time statistics
