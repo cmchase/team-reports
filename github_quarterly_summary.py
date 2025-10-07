@@ -408,17 +408,6 @@ class GitHubQuarterlySummary:
             contributor_section = self.generate_contributor_details(contributor, performance)
             report.extend(contributor_section)
         
-        # Add footer
-        report.extend([
-            "---",
-            "",
-            f"### ✅ Q{quarter} {year} GitHub Contributor Report Complete",
-            "",
-            "*This quarterly report was generated automatically from GitHub repository data.*",
-            f"*Report covers the period from {start_date} to {end_date}*",
-            f"*Focus: Individual contributor performance and code contribution tracking*"
-        ])
-        
         return "\n".join(report)
 
     def generate_quarterly_summary(self, year: int, quarter: int) -> str:
@@ -723,9 +712,21 @@ def main():
         # if enable_review_depth:
         #     report += generate_quarterly_review_depth_trends(config, year, quarter)
         
+        # Add footer before configuration block
+        start_date, end_date = get_quarter_range(year, quarter)
+        footer_section = f"""
+---
+
+### ✅ Q{quarter} {year} GitHub Contributor Report Complete
+
+*This quarterly report was generated automatically from GitHub repository data.*
+*Report covers the period from {start_date} to {end_date}*
+*Focus: Individual contributor performance and code contribution tracking*
+"""
+        
         # Append active configuration block
         config_block = render_active_config(config)
-        full_report = report + config_block
+        full_report = report + footer_section + config_block
         
         # Save the report
         quarter_filename = f"github_quarterly_summary_Q{quarter}_{year}.md"
