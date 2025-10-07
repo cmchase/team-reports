@@ -461,19 +461,6 @@ class GitHubWeeklySummary:
         # Add contributor details
         report_lines.extend(self.generate_contributor_details(performance))
         
-        # Add footer
-        report_lines.extend([
-            "---",
-            "",
-            "## 📋 Summary",
-            "This weekly GitHub summary provides insights into repository activity, code contributions, and team collaboration patterns. Use this data for sprint reviews, team discussions, and identifying collaboration opportunities.",
-            "",
-            f"**Report Period:** {start_date} to {end_date}",
-            f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            f"**Repositories Analyzed:** {len(self.repositories)}",
-            ""
-        ])
-        
         return '\n'.join(report_lines)
 
 
@@ -659,9 +646,22 @@ def main():
         # if enable_review_depth:
         #     report_content += generate_review_depth_analysis(config, start_date, end_date)
         
+        # Add footer before configuration block
+        footer_section = f"""
+---
+
+## 📋 Summary
+This weekly GitHub summary provides insights into repository activity, code contributions, and team collaboration patterns. Use this data for sprint reviews, team discussions, and identifying collaboration opportunities.
+
+**Report Period:** {start_date} to {end_date}
+**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+**Repositories Analyzed:** {len(config.get('repositories', []))}
+
+"""
+        
         # Append active configuration block
         config_block = render_active_config(config)
-        full_report = report_content + config_block
+        full_report = report_content + footer_section + config_block
         
         # Save the report
         ensure_reports_directory()
