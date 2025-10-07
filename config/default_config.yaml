@@ -11,13 +11,24 @@ github:
   org: ""
   token: ""
 
-# Future feature flags and metrics (Phase 2+)
-metrics: {}
+# Feature flags for metrics (Phase 2+)
+metrics:
+  flow:
+    cycle_time: false      # Jira cycle time analysis
+    wip: false            # Jira work-in-progress tracking
+    blocked_time: false   # Jira blocked time analysis
+  delivery:
+    pr_lead_time: false   # GitHub PR lead time analysis
+    review_depth: false   # GitHub PR review analysis
+  growth:
+    enabled: false        # Growth and coaching signals
 
 # Configurable thresholds for analytics
 thresholds:
   wip:
     max_per_engineer: 3  # Default WIP limit per engineer
+  delivery:
+    min_lines_changed: 5  # Minimum lines changed to include PR in lead time analysis
 
 # State mappings for different systems  
 states:

@@ -11,7 +11,7 @@ echo "====================================="
 # Check if we're in the right directory
 if [ ! -f "github_quarterly_summary.py" ]; then
     echo "❌ Error: github_quarterly_summary.py not found in current directory"
-    echo "Please run this script from the jira-weekly-reports directory"
+    echo "Please run this script from the team-reports directory"
     exit 1
 fi
 

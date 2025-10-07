@@ -12,8 +12,17 @@ All new features maintain the same **Markdown-only**, **configuration-driven**, 
 - ✅ **Feature Flag Infrastructure** – Per-metric flags wired across all report generators  
 - ✅ **Active Configuration Display** – Hash-based config tracking with automatic secret redaction
 - ✅ **Comprehensive Testing** – 146+ unit tests with CI-ready foundation
+- ✅ **Batch Processing System** – Source-agnostic batch weekly report generation for multiple weeks
+- ✅ **Flow Metrics Implementation** – Cycle time and WIP metrics with configurable thresholds
+- ✅ **Report Quality Improvements** – Enhanced table formatting and full title display
 
-**Ready for implementation:** Flow and delivery metric calculations with feature-flag controlled rollout.
+**Ready for implementation:** GitHub delivery metrics (PR lead time, review depth) and blocked time tracking for Jira.
+
+**Key learnings from recent implementation:**
+- Batch processing significantly improves productivity for historical analysis and backfill scenarios
+- Feature flag infrastructure allows safe rollout of new metrics without affecting existing workflows  
+- Configuration-driven approach enables easy customization per team without code changes
+- Comprehensive testing prevents regressions and ensures reliability at scale
 
 ---
 
@@ -33,22 +42,25 @@ All new features maintain the same **Markdown-only**, **configuration-driven**, 
 * **Rich Markdown Output**
 
   * Structured reports with tables, highlights, and contributor summaries.
-* **Automation**
+* **Automation & Batch Processing**
 
   * Shell script execution for fast report generation.
+  * Batch processing system for multiple weeks of reports across Jira and GitHub data sources.
+  * Flexible date range options (last-N weeks, N weeks from date, date ranges).
 * **Extensible Architecture**
 
-  * Modular utilities for configuration, date handling, and API access.
+  * Modular utilities for configuration, date handling, batch processing, and API access.
+  * Comprehensive testing coverage with 29+ batch utility tests.
 
 ---
 
-## 🔥 Phase 2 — Data-Driven Metrics (🚧 Implementation Ready)
+## 🔥 Phase 2 — Data-Driven Metrics (🚧 Partially Complete)
 
 ### Flow Metrics (Jira)
 
-* **Cycle Time** – Time from "In Progress" → "Done" with team median and p90 values.
-* **Work In Progress (WIP)** – Current active tickets per engineer and team total.
-* **Blocked Time** – Total time spent in Blocked or equivalent states.
+* ✅ **Cycle Time** – Time from "In Progress" → "Done" with team median and p90 values, controlled by `metrics.flow.cycle_time` flag.
+* ✅ **Work In Progress (WIP)** – Current active tickets per engineer and team total with configurable thresholds and over-limit warnings, controlled by `metrics.flow.wip` flag.
+* **Blocked Time** – Total time spent in Blocked or equivalent states (planned).
 
 ### Delivery Metrics (GitHub)
 
@@ -74,6 +86,15 @@ All new features maintain the same **Markdown-only**, **configuration-driven**, 
 * ✅ **Configuration validation** – Schema validation with strict/non-strict modes  
 * ✅ **Active config display** – Hash-based config tracking in report footers with secret redaction
 * ✅ **Environment integration** – Structured `.env` mapping with automatic redaction
+
+### Batch Processing & Report Quality ✅ **COMPLETED**
+
+* ✅ **Source-Agnostic Batch Processing** – Unified `run_batch_weekly.sh` script supporting both Jira and GitHub reports
+* ✅ **Flexible Date Handling** – Support for last-N weeks, N weeks from date, and custom date ranges
+* ✅ **Shared Utilities** – `utils/batch.py` module with reusable date manipulation and argument parsing functions  
+* ✅ **Enhanced Report Formatting** – Removed title truncation for improved readability while maintaining table structure
+* ✅ **Comprehensive Testing** – 29 unit tests for batch functionality covering date manipulation, validation, and integration workflows
+* ✅ **Configuration Options** – Support for categorized vs. consolidated ticket views with `enable_categorization` flag
 
 ---
 
@@ -172,14 +193,16 @@ Each new capability will be developed as **incremental, self-contained commits**
 
 ## ✅ Priority Summary
 
-| Category                            | Focus                                 | Priority  |
-| ----------------------------------- | ------------------------------------- | --------- |
-| **Unified Reports (Jira+GitHub)**   | Cross-platform correlation            | 🔥 High   |
-| **Flow & Delivery Metrics**         | Jira/GitHub performance indicators    | 🔥 High   |
-| **Coaching Signals**                | Growth-oriented insights              | 🔥 High   |
-| **Trend Analysis & CSV Exports**    | Historical and external visualization | 🔧 Medium |
-| **Slack/Dashboard Integrations**    | Quality-of-life enhancements          | 💡 Future |
-| **Scheduling & Multi-Team Support** | Scalability improvements              | 💡 Future |
+| Category                            | Focus                                 | Status     | Priority  |
+| ----------------------------------- | ------------------------------------- | ---------- | --------- |
+| **Batch Processing System**         | Multi-week report generation          | ✅ **Done** | ~~High~~  |
+| **Basic Flow Metrics (Cycle/WIP)**  | Jira performance indicators           | ✅ **Done** | ~~High~~  |
+| **Enhanced Delivery Metrics**       | GitHub PR metrics and review depth    | 🚧 Planned | 🔥 High   |
+| **Unified Reports (Jira+GitHub)**   | Cross-platform correlation            | 📋 Planned | 🔥 High   |
+| **Coaching Signals**                | Growth-oriented insights              | 📋 Planned | 🔥 High   |
+| **Trend Analysis & CSV Exports**    | Historical and external visualization | 📋 Planned | 🔧 Medium |
+| **Slack/Dashboard Integrations**    | Quality-of-life enhancements          | 📋 Planned | 💡 Future |
+| **Scheduling & Multi-Team Support** | Scalability improvements              | 📋 Planned | 💡 Future |
 
 ---
 
