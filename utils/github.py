@@ -255,3 +255,186 @@ def format_lead_time_duration(hours: float) -> str:
         return f"{days}d"
     else:
         return f"{days}d {remaining_hours:.1f}h"
+
+
+def generate_pr_lead_time_analysis(
+    config: Dict[str, Any], 
+    start_date: str, 
+    end_date: str,
+    report_type: str = "weekly",  # "weekly" or "quarterly"
+    year: Optional[int] = None,
+    quarter: Optional[int] = None,
+    all_prs_data: Optional[Dict[str, List[Dict]]] = None
+) -> str:
+    """
+    Unified PR lead time analysis for both weekly and quarterly reports.
+    
+    Args:
+        config: Configuration dictionary with GitHub settings
+        start_date: Start date in YYYY-MM-DD format
+        end_date: End date in YYYY-MM-DD format  
+        report_type: "weekly" or "quarterly" for report-specific formatting
+        year: Year for quarterly reports (required if report_type="quarterly")
+        quarter: Quarter number for quarterly reports (required if report_type="quarterly")
+        all_prs_data: Optional pre-fetched PR data to avoid duplicate API calls
+        
+    Returns:
+        str: Markdown section with PR lead time analysis
+    """
+    try:
+        from .github_client import GitHubApiClient
+        
+        # Get configuration values
+        min_lines_changed = config.get('thresholds', {}).get('delivery', {}).get('min_lines_changed', 5)
+        repositories = config.get('repositories', [])
+        
+        if not repositories:
+            title = "Weekly" if report_type == "weekly" else f"Q{quarter} {year} Quarterly"
+            return f"\n\n### 🚀 Delivery • {title} PR Lead Time\n\n*No repositories configured for analysis*\n"
+        
+        print(f"🚀 Computing {report_type} PR lead time analysis...")
+        
+        # Initialize GitHub client
+        github_client = GitHubApiClient()
+        
+        # Get merged PRs for the date range
+        all_prs = github_client.get_merged_prs_for_lead_time(start_date, end_date, all_prs_data)
+        
+        # Compute lead time statistics
+        stats = compute_pr_lead_time_stats(all_prs, min_lines_changed)
+        
+        if stats['count'] == 0:
+            if report_type == "quarterly":
+                return f"\n\n### 🚀 Delivery • Quarterly PR Lead Time\n\n*No merged PRs with ≥{min_lines_changed} lines changed found in Q{quarter} {year}*\n"
+            else:
+                return f"\n\n### 🚀 Delivery • PR Lead Time\n\n*No merged PRs with ≥{min_lines_changed} lines changed found in this period*\n"
+        
+        # Build the section header based on report type
+        if report_type == "quarterly":
+            section = f"\n\n### 🚀 Delivery • Quarterly PR Lead Time\n\n"
+            section += f"**Analysis Period:** Q{quarter} {year} ({start_date} to {end_date})\n"
+            section += f"**Merged PRs Analyzed:** {stats['count']} PRs (≥{min_lines_changed} lines changed)\n\n"
+        else:
+            section = f"\n\n### 🚀 Delivery • PR Lead Time\n\n"
+            section += f"**Merged PRs Analyzed:** {stats['count']} PRs (≥{min_lines_changed} lines changed)\n\n"
+        
+        # Summary statistics (common to both report types)
+        avg_formatted = format_lead_time_duration(stats['avg'])
+        median_formatted = format_lead_time_duration(stats['median']) 
+        p90_formatted = format_lead_time_duration(stats['p90'])
+        
+        if report_type == "quarterly":
+            section += f"**📊 Quarter Summary**\n"
+        else:
+            section += f"**📊 Lead Time Summary**\n"
+        
+        section += f"- **Average:** {avg_formatted}\n"
+        section += f"- **Median:** {median_formatted}\n" 
+        section += f"- **90th Percentile:** {p90_formatted}\n\n"
+        
+        # Monthly breakdown for quarterly reports (if enough data)
+        if report_type == "quarterly" and stats['count'] >= 10 and quarter and year:
+            section += _generate_quarterly_monthly_breakdown(all_prs, year, quarter, min_lines_changed, start_date, end_date)
+        
+        # Top performers (fastest PRs) - common to both
+        if stats['fastest']:
+            section += f"#### ⚡ Top 5 Fastest PRs\n\n"
+            section += "| PR | Author | Lead Time | Lines | Title |\n"
+            section += "|-------|--------|-----------|-------|-------|\n"
+            
+            for pr in stats['fastest'][:5]:
+                lead_time_str = format_lead_time_duration(pr['lead_time_hours'])
+                lines_changed = pr['additions'] + pr['deletions']
+                title = pr['title'][:50] + "..." if len(pr['title']) > 50 else pr['title']
+                section += f"| [#{pr['number']}]({pr['url']}) | {pr['author']} | {lead_time_str} | {lines_changed} | {title} |\n"
+            section += "\n"
+        
+        # Top 5 slowest PRs (common to both)
+        if stats['slowest']:
+            section += f"#### 🐌 Top 5 Slowest PRs\n\n"
+            section += "| PR | Author | Lead Time | Lines | Title |\n"
+            section += "|-------|--------|-----------|-------|-------|\n"
+            
+            for pr in stats['slowest'][:5]:
+                lead_time_str = format_lead_time_duration(pr['lead_time_hours'])
+                lines_changed = pr['additions'] + pr['deletions']
+                title = pr['title'][:50] + "..." if len(pr['title']) > 50 else pr['title']
+                section += f"| [#{pr['number']}]({pr['url']}) | {pr['author']} | {lead_time_str} | {lines_changed} | {title} |\n"
+            section += "\n"
+        
+        return section
+        
+    except Exception as e:
+        error_title = "Quarterly PR Lead Time" if report_type == "quarterly" else "PR Lead Time"
+        return f"\n\n### 🚀 Delivery • {error_title}\n\n*Error computing PR lead time analysis: {e}*\n"
+
+
+def _generate_quarterly_monthly_breakdown(all_prs: List[Dict], year: int, quarter: int, 
+                                        min_lines_changed: int, start_date: str, end_date: str) -> str:
+    """Generate monthly trend analysis for quarterly reports."""
+    section = f"**📈 Monthly Trend Analysis**\n"
+    
+    # Group PRs by month within the quarter
+    monthly_stats = {}
+    quarter_months = []
+    
+    # Determine which months are in this quarter
+    quarter_start_month = (quarter - 1) * 3 + 1
+    for month_offset in range(3):
+        month_num = quarter_start_month + month_offset
+        if month_num <= 12:
+            quarter_months.append(month_num)
+    
+    for month in quarter_months:
+        month_prs = []
+        month_start = f"{year}-{month:02d}-01"
+        
+        # Find last day of month (simple approximation)
+        if month in [1, 3, 5, 7, 8, 10, 12]:
+            last_day = 31
+        elif month in [4, 6, 9, 11]:
+            last_day = 30
+        else:  # February
+            last_day = 29 if year % 4 == 0 else 28
+        
+        month_end = f"{year}-{month:02d}-{last_day:02d}"
+        
+        for pr in all_prs:
+            if pr.get('merged_at'):
+                merged_date = pr['merged_at'][:10]
+                if month_start <= merged_date <= month_end:
+                    month_prs.append(pr)
+        
+        if month_prs:
+            month_stat = compute_pr_lead_time_stats(month_prs, min_lines_changed)
+            if month_stat['count'] > 0:
+                monthly_stats[month] = month_stat
+    
+    if monthly_stats:
+        section += "| Month | PRs | Median Lead Time | Trend |\n"
+        section += "|-------|-----|------------------|-------|\n"
+        
+        month_names = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
+                     7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
+        
+        prev_median = None
+        for month in sorted(monthly_stats.keys()):
+            stats = monthly_stats[month]
+            median_str = format_lead_time_duration(stats['median'])
+            
+            # Simple trend indicator
+            trend = "—"
+            if prev_median is not None:
+                if stats['median'] < prev_median * 0.9:
+                    trend = "📉 Improving"
+                elif stats['median'] > prev_median * 1.1:
+                    trend = "📈 Increasing"
+                else:
+                    trend = "➡️ Stable"
+            
+            section += f"| {month_names[month]} | {stats['count']} | {median_str} | {trend} |\n"
+            prev_median = stats['median']
+        
+        section += "\n"
+    
+    return section
