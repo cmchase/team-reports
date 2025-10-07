@@ -27,48 +27,26 @@ sys.path.insert(0, '.')
 
 from dotenv import load_dotenv
 from jira import JIRA
-from utils.ticket import categorize_ticket, format_ticket_info
-from utils.jira import initialize_jira_client, fetch_tickets_for_date_range, fetch_tickets_with_changelog, compute_cycle_time_days, compute_cycle_time_stats
+from utils.jira import fetch_tickets_with_changelog, compute_cycle_time_days, compute_cycle_time_stats
 from utils.date import parse_date_args as parse_date_args_util
 from utils.config import load_config, get_config
 from utils.report import create_summary_report, save_report, generate_filename, render_active_config
+from utils.jira_summary_base import JiraSummaryBase
 
 # Load environment variables
 load_dotenv()
 
-class WeeklyTeamSummary:
+class WeeklyTeamSummary(JiraSummaryBase):
     def __init__(self, config_file='config/jira_config.yaml'):
-        self.jira_client = None
-        self.config = self._load_config(config_file)
-        self.base_jql = self.config['base_jql']
-        self.team_categories = self.config['team_categories']
+        """Initialize the weekly team summary generator with configuration."""
+        super().__init__(config_file)
         
-    def _load_config(self, config_file: str) -> Dict[str, Any]:
-        """Load configuration from YAML file with defaults and environment overrides"""
-        return get_config([config_file])
-            
-
-        
-    def initialize(self):
-        """Initialize the Jira client connection"""
-        self.jira_client = initialize_jira_client()
-        
-    # Removed - now using jira_utils.build_jql_with_dates
-        
-    def fetch_tickets(self, start_date: str, end_date: str) -> List[Any]:
-        """Fetch tickets for the specified date range"""
-        print(f"🔍 Searching tickets from {start_date} to {end_date}...")
-        # Get default status filter from config, fallback to 'completed'
-        default_filter = self.config.get('report_settings', {}).get('default_status_filter', 'completed')
-        return fetch_tickets_for_date_range(self.jira_client, self.base_jql, start_date, end_date, self.config, default_filter)
-            
-    def categorize_ticket(self, issue) -> str:
-        """Categorize a ticket into one of the team categories"""
-        return categorize_ticket(issue, self.team_categories)
-        
-    def format_ticket_info(self, issue) -> Dict[str, str]:
-        """Format ticket information for display"""
-        return format_ticket_info(issue, self.jira_client.server_url, self.config)
+    # All common methods now inherited from JiraSummaryBase:
+    # - _load_config: inherited via JiraApiClient
+    # - initialize: inherited from JiraSummaryBase
+    # - fetch_tickets: inherited from JiraSummaryBase
+    # - categorize_ticket: inherited from JiraSummaryBase
+    # - format_ticket_info: inherited from JiraSummaryBase
     
     # Removed - now using report_utils.format_table_row
         

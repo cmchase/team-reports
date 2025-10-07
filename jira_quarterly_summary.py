@@ -23,54 +23,26 @@ sys.path.insert(0, '.')
 
 from dotenv import load_dotenv
 from jira import JIRA
-from utils.ticket import format_ticket_info
-from utils.jira import initialize_jira_client, fetch_tickets_for_date_range, fetch_tickets_with_changelog, compute_cycle_time_days, compute_cycle_time_stats
+from utils.jira import fetch_tickets_with_changelog, compute_cycle_time_days, compute_cycle_time_stats
 from utils.date import get_current_quarter, get_quarter_range, parse_quarter_from_date
 from utils.config import load_config, get_config
 from utils.report import generate_filename, save_report, ensure_reports_directory, render_active_config
+from utils.jira_summary_base import JiraSummaryBase
 
 # Load environment variables
 load_dotenv()
 
 
-class QuarterlyTeamSummary:
+class QuarterlyTeamSummary(JiraSummaryBase):
     def __init__(self, config_file='config/jira_config.yaml'):
         """Initialize the quarterly team summary generator with configuration."""
-        # Initialize JIRA client as None - will be set up later in initialize()
-        self.jira_client = None
+        super().__init__(config_file)
         
-        # Load configuration from YAML file using utility function
-        self.config = self._load_config(config_file)
-        
-        # Extract commonly used config values for easy access
-        self.base_jql = self.config['base_jql']  # Base JQL query for ticket filtering
-        
-    def _load_config(self, config_file: str) -> Dict[str, Any]:
-        """Load configuration from YAML file using utility function."""
-        # Delegate to utility function which handles error checking and validation
-        return load_config(config_file)
-        
-    def initialize(self):
-        """Initialize the Jira client connection using environment variables."""
-        # Set up JIRA client using credentials from environment variables (.env file)
-        # This handles authentication and connection validation
-        self.jira_client = initialize_jira_client()
-        
-    def fetch_tickets(self, start_date: str, end_date: str) -> List[Any]:
-        """Fetch tickets for the specified quarterly date range."""
-        print(f"🔍 Searching tickets for quarter from {start_date} to {end_date}...")
-        
-        # Use utility function to fetch tickets with date range filtering
-        # Combines base JQL with date constraints and status filters
-        # Get default status filter from config, fallback to 'completed'
-        default_filter = self.config.get('report_settings', {}).get('default_status_filter', 'completed')
-        return fetch_tickets_for_date_range(self.jira_client, self.base_jql, start_date, end_date, self.config, default_filter)
-        
-    def format_ticket_info(self, issue) -> Dict[str, str]:
-        """Format ticket information into a standardized dictionary for display."""
-        # Extract and format key ticket fields (ID, title, assignee, status, etc.)
-        # Returns structured data for consistent report formatting
-        return format_ticket_info(issue, self.jira_client.server_url, self.config)
+    # All common methods now inherited from JiraSummaryBase:
+    # - _load_config: inherited via JiraApiClient
+    # - initialize: inherited from JiraSummaryBase
+    # - fetch_tickets: inherited from JiraSummaryBase  
+    # - format_ticket_info: inherited from JiraSummaryBase
     
     def analyze_contributor_performance(self, tickets: List[Any]) -> Dict[str, Any]:
         """Analyze individual contributor performance and productivity metrics."""
