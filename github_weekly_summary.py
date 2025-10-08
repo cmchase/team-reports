@@ -72,8 +72,20 @@ class GitHubWeeklySummary(GitHubSummaryBase):
 def main():
     """Main function to generate and save the weekly GitHub summary report."""
     try:
-        # Parse command line arguments
-        start_date, end_date, config_file = parse_date_args("weekly")
+        # Extract config file first, before date parsing
+        config_file = 'config/github_config.yaml'
+        date_args = []
+        
+        # Filter sys.argv to separate date args from config file
+        for arg in sys.argv[1:]:
+            if arg.endswith('.yaml'):
+                config_file = arg
+                print(f"📝 Using custom config file: {config_file}")
+            else:
+                date_args.append(arg)
+        
+        # Parse dates from filtered arguments
+        start_date, end_date = parse_date_args(date_args)
         
         print(f"\n📅 Generating Weekly GitHub Summary for: {start_date} to {end_date}")
         print(f"⚙️  Using config: {config_file}")
@@ -127,7 +139,7 @@ def main():
         ensure_reports_directory()
         
         # Generate filename and save report
-        filename = generate_filename(start_date, end_date, 'github_weekly_summary')
+        filename = generate_filename('github_weekly_summary', start_date, end_date)
         filepath = save_report(report, filename)
         
         print(f"\n✅ Weekly GitHub Summary Report Generated Successfully!")
