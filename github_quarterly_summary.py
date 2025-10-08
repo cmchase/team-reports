@@ -126,7 +126,7 @@ def main():
         # Add configuration information if enabled
         config_flag = flag("report.show_active_config")
         if config_flag:
-            config_section = render_active_config(quarterly_summary.config, "GitHub Quarterly Report Configuration")
+            config_section = render_active_config(quarterly_summary.config)
             report += config_section
         
         # Ensure reports directory exists
