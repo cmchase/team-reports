@@ -10,6 +10,93 @@ import requests
 from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 import statistics
+import re
+
+
+def is_bot_user(username: str, bot_patterns: List[str]) -> bool:
+    """
+    Check if a username matches any bot patterns from config.
+    
+    Args:
+        username: GitHub username to check
+        bot_patterns: List of regex patterns to match against bot usernames
+        
+    Returns:
+        bool: True if username matches any bot pattern
+        
+    Examples:
+        >>> bot_patterns = ['.*bot.*', 'dependabot', 'github-actions.*']
+        >>> is_bot_user('dependabot[bot]', bot_patterns)
+        True
+        >>> is_bot_user('john-doe', bot_patterns)
+        False
+    """
+    if not username or not bot_patterns:
+        return False
+        
+    username_lower = username.lower()
+    
+    for pattern in bot_patterns:
+        try:
+            if re.search(pattern.lower(), username_lower):
+                return True
+        except re.error:
+            # Skip invalid regex patterns
+            continue
+            
+    return False
+
+
+def compute_pr_review_depth(pr: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, int]:
+    """
+    Compute review depth metrics for a pull request.
+    
+    Args:
+        pr: GitHub PR object with reviews and review comments
+        config: Configuration dict containing bot patterns
+        
+    Returns:
+        Dict containing reviewers_count and review_comments_count
+        
+    Example:
+        >>> config = {'bots': {'patterns': ['.*bot.*', 'dependabot']}}
+        >>> pr_data = {
+        ...     'reviews': [
+        ...         {'user': {'login': 'reviewer1'}},
+        ...         {'user': {'login': 'bot-reviewer'}},
+        ...         {'user': {'login': 'reviewer2'}}
+        ...     ],
+        ...     'review_comments': [
+        ...         {'user': {'login': 'reviewer1'}},
+        ...         {'user': {'login': 'reviewer1'}},
+        ...         {'user': {'login': 'bot-reviewer'}}
+        ...     ]
+        ... }
+        >>> metrics = compute_pr_review_depth(pr_data, config)
+        >>> print(f"Reviewers: {metrics['reviewers_count']}, Comments: {metrics['review_comments_count']}")
+    """
+    bot_patterns = config.get('bots', {}).get('patterns', [])
+    
+    # Count unique reviewers (excluding bots)
+    reviewers = set()
+    for review in pr.get('reviews', []):
+        user = review.get('user', {})
+        username = user.get('login', '')
+        if username and not is_bot_user(username, bot_patterns):
+            reviewers.add(username)
+    
+    # Count review comments (excluding bots)
+    comment_count = 0
+    for comment in pr.get('review_comments', []):
+        user = comment.get('user', {})
+        username = user.get('login', '')
+        if username and not is_bot_user(username, bot_patterns):
+            comment_count += 1
+    
+    return {
+        'reviewers_count': len(reviewers),
+        'review_comments_count': comment_count
+    }
 
 
 def compute_pr_lead_time_hours(pr: Dict[str, Any]) -> Optional[float]:
@@ -438,3 +525,111 @@ def _generate_quarterly_monthly_breakdown(all_prs: List[Dict], year: int, quarte
         section += "\n"
     
     return section
+
+
+def compute_review_depth_stats(prs: List[Dict[str, Any]], config: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Compute review depth statistics for a list of PRs.
+    
+    Args:
+        prs: List of GitHub PR objects with reviews and review comments
+        config: Configuration dict containing bot patterns
+        
+    Returns:
+        Dict with review depth statistics
+        
+    Example:
+        >>> config = {'bots': {'patterns': ['.*bot.*']}}
+        >>> stats = compute_review_depth_stats(pr_list, config)
+        >>> print(f"Median reviewers: {stats['median_reviewers']}, Median comments: {stats['median_comments']}")
+    """
+    reviewers_counts = []
+    comments_counts = []
+    
+    for pr in prs:
+        # Only include merged PRs
+        if not pr.get('merged_at'):
+            continue
+            
+        depth_metrics = compute_pr_review_depth(pr, config)
+        reviewers_counts.append(depth_metrics['reviewers_count'])
+        comments_counts.append(depth_metrics['review_comments_count'])
+    
+    if not reviewers_counts:
+        return {
+            'count': 0,
+            'median_reviewers': 0.0,
+            'median_comments': 0.0,
+            'avg_reviewers': 0.0,
+            'avg_comments': 0.0
+        }
+    
+    return {
+        'count': len(reviewers_counts),
+        'median_reviewers': statistics.median(reviewers_counts) if reviewers_counts else 0.0,
+        'median_comments': statistics.median(comments_counts) if comments_counts else 0.0,
+        'avg_reviewers': statistics.mean(reviewers_counts) if reviewers_counts else 0.0,
+        'avg_comments': statistics.mean(comments_counts) if comments_counts else 0.0
+    }
+
+
+def generate_review_depth_analysis(
+    config: Dict[str, Any], 
+    start_date: str, 
+    end_date: str,
+    report_type: str = "weekly",
+    all_prs_data: Optional[Dict[str, List[Dict]]] = None
+) -> str:
+    """
+    Generate review depth analysis section for GitHub reports.
+    
+    Args:
+        config: Configuration dictionary with GitHub settings
+        start_date: Start date in YYYY-MM-DD format
+        end_date: End date in YYYY-MM-DD format  
+        report_type: "weekly" or "quarterly" for report-specific formatting
+        all_prs_data: Optional pre-fetched PR data to avoid duplicate API calls
+        
+    Returns:
+        str: Markdown section with review depth analysis
+    """
+    try:
+        from .github_client import GitHubApiClient
+        
+        repositories = config.get('repositories', [])
+        
+        if not repositories:
+            return f"\n\n### 📊 Delivery • Review Depth\n\n*No repositories configured for analysis*\n"
+        
+        print(f"📊 Computing {report_type} review depth analysis...")
+        
+        # Initialize GitHub client if we need to fetch data
+        if not all_prs_data:
+            github_client = GitHubApiClient()
+            all_data = github_client.fetch_all_data(start_date, end_date)
+            all_prs_data = all_data['pull_requests']
+        
+        # Collect all PRs across repositories
+        all_prs = []
+        for repo_path, prs in all_prs_data.items():
+            all_prs.extend(prs)
+        
+        # Compute review depth statistics
+        stats = compute_review_depth_stats(all_prs, config)
+        
+        if stats['count'] == 0:
+            return f"\n\n### 📊 Delivery • Review Depth\n\n*No merged PRs found in this period*\n"
+        
+        # Build the section
+        section = f"\n\n### 📊 Delivery • Review Depth\n\n"
+        section += f"**Merged PRs Analyzed:** {stats['count']} PRs\n\n"
+        
+        # Summary statistics
+        section += f"**📈 Review Engagement**\n"
+        section += f"- **Median Reviewers per PR:** {stats['median_reviewers']:.1f}\n"
+        section += f"- **Median Comments per PR:** {stats['median_comments']:.1f}\n\n"
+        
+        return section
+        
+    except Exception as e:
+        return f"\n\n### 📊 Delivery • Review Depth\n\n*Error computing review depth analysis: {e}*\n"

@@ -85,6 +85,32 @@ class GitHubApiClient:
             'changed_files': pr_data.get('changed_files', 0)
         }
     
+    def _fetch_pr_reviews(self, repo: str, pr_number: int) -> List[Dict]:
+        """Fetch reviews for a specific pull request."""
+        endpoint = f"repos/{repo}/pulls/{pr_number}/reviews"
+        
+        # Add small delay to avoid hitting rate limits
+        time.sleep(0.1)
+        
+        try:
+            return self._make_request(endpoint)
+        except Exception as e:
+            print(f"  ⚠️  Warning: Could not fetch reviews for PR #{pr_number}: {e}")
+            return []
+    
+    def _fetch_pr_review_comments(self, repo: str, pr_number: int) -> List[Dict]:
+        """Fetch review comments for a specific pull request."""
+        endpoint = f"repos/{repo}/pulls/{pr_number}/comments"
+        
+        # Add small delay to avoid hitting rate limits
+        time.sleep(0.1)
+        
+        try:
+            return self._make_request(endpoint)
+        except Exception as e:
+            print(f"  ⚠️  Warning: Could not fetch review comments for PR #{pr_number}: {e}")
+            return []
+    
     def _build_repo_path(self, repo: str) -> str:
         """Build full repository path with organization if configured."""
         return f"{self.github_org}/{repo}" if self.github_org else repo
@@ -121,6 +147,14 @@ class GitHubApiClient:
                     pr['additions'] = 0
                     pr['deletions'] = 0
                     pr['changed_files'] = 0
+                
+                # Fetch reviews and review comments if review_depth is enabled
+                if self.config.get('metrics', {}).get('delivery', {}).get('review_depth', False):
+                    pr['reviews'] = self._fetch_pr_reviews(repo_path, pr['number'])
+                    pr['review_comments'] = self._fetch_pr_review_comments(repo_path, pr['number'])
+                else:
+                    pr['reviews'] = []
+                    pr['review_comments'] = []
                 
                 filtered_prs.append(pr)
         

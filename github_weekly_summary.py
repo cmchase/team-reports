@@ -25,7 +25,7 @@ from dotenv import load_dotenv
 from utils.date import parse_date_args, get_current_week
 from utils.config import load_config, get_config
 from utils.report import ensure_reports_directory, save_report, generate_filename, render_active_config
-from utils.github import generate_pr_lead_time_analysis
+from utils.github import generate_pr_lead_time_analysis, generate_review_depth_analysis
 from utils.github_summary_base import GitHubSummaryBase
 
 # Load environment variables
@@ -105,13 +105,22 @@ def main():
             )
             report += pr_lead_time_section
         
+        # Add Review Depth analysis if enabled
+        enable_review_depth = flag("metrics.delivery.review_depth")
+        
+        if enable_review_depth:
+            review_depth_section = generate_review_depth_analysis(
+                weekly_summary.config, start_date, end_date, "weekly", pr_data
+            )
+            report += review_depth_section
+        
         # Add footer before configuration
         report += "\n\n---\n\n"
         
         # Add configuration information if enabled
         config_flag = flag("report.show_active_config")
         if config_flag:
-            config_section = render_active_config(weekly_summary.config, "GitHub Weekly Report Configuration")
+            config_section = render_active_config(weekly_summary.config)
             report += config_section
         
         # Ensure reports directory exists

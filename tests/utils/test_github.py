@@ -11,7 +11,10 @@ from utils.github import (
     compute_pr_lead_time_hours,
     compute_pr_lead_time_stats,
     is_trivial_pr,
-    format_lead_time_duration
+    format_lead_time_duration,
+    is_bot_user,
+    compute_pr_review_depth,
+    compute_review_depth_stats
 )
 
 
@@ -347,3 +350,256 @@ class TestIntegration:
             assert 'lead_time_hours' in pr_info
             assert 'additions' in pr_info
             assert 'deletions' in pr_info
+
+
+class TestBotExclusion:
+    """Test bot user identification and exclusion"""
+    
+    def test_is_bot_user_matches_patterns(self):
+        """Test that bot patterns correctly identify bot users"""
+        bot_patterns = ['.*bot.*', 'dependabot', 'github-actions.*']
+        
+        # Test bot users that should match
+        assert is_bot_user('dependabot[bot]', bot_patterns) is True
+        assert is_bot_user('github-actions[bot]', bot_patterns) is True
+        assert is_bot_user('renovate-bot', bot_patterns) is True
+        assert is_bot_user('codecov-bot', bot_patterns) is True
+        assert is_bot_user('my-custom-bot', bot_patterns) is True
+        
+        # Test regular users that should not match
+        assert is_bot_user('john-doe', bot_patterns) is False
+        assert is_bot_user('alice-smith', bot_patterns) is False
+        assert is_bot_user('developer1', bot_patterns) is False
+    
+    def test_is_bot_user_case_insensitive(self):
+        """Test that bot pattern matching is case insensitive"""
+        bot_patterns = ['DEPENDABOT', '.*BOT.*']
+        
+        assert is_bot_user('dependabot[bot]', bot_patterns) is True
+        assert is_bot_user('DependaBot', bot_patterns) is True
+        assert is_bot_user('my-bot-service', bot_patterns) is True
+        assert is_bot_user('MY-BOT-SERVICE', bot_patterns) is True
+    
+    def test_is_bot_user_empty_patterns(self):
+        """Test behavior with empty bot patterns"""
+        assert is_bot_user('dependabot[bot]', []) is False
+        assert is_bot_user('regular-user', []) is False
+    
+    def test_is_bot_user_empty_username(self):
+        """Test behavior with empty or None username"""
+        bot_patterns = ['.*bot.*']
+        
+        assert is_bot_user('', bot_patterns) is False
+        assert is_bot_user(None, bot_patterns) is False
+    
+    def test_is_bot_user_invalid_regex(self):
+        """Test handling of invalid regex patterns"""
+        # Invalid regex pattern with unmatched bracket
+        bot_patterns = ['[invalid-regex', '.*bot.*']
+        
+        # Should still work for valid patterns, skip invalid ones
+        assert is_bot_user('my-bot', bot_patterns) is True
+        assert is_bot_user('regular-user', bot_patterns) is False
+
+
+class TestReviewDepth:
+    """Test PR review depth calculation functionality"""
+    
+    def test_compute_pr_review_depth_basic(self):
+        """Test basic review depth calculation"""
+        config = {
+            'bots': {'patterns': ['.*bot.*', 'dependabot']}
+        }
+        
+        pr_data = {
+            'reviews': [
+                {'user': {'login': 'reviewer1'}},
+                {'user': {'login': 'reviewer2'}},
+                {'user': {'login': 'dependabot[bot]'}},  # Should be excluded
+                {'user': {'login': 'reviewer1'}}  # Duplicate, should count as 1 reviewer
+            ],
+            'review_comments': [
+                {'user': {'login': 'reviewer1'}},
+                {'user': {'login': 'reviewer1'}},
+                {'user': {'login': 'reviewer2'}},
+                {'user': {'login': 'code-bot'}},  # Should be excluded
+                {'user': {'login': 'reviewer3'}}
+            ]
+        }
+        
+        result = compute_pr_review_depth(pr_data, config)
+        
+        # Should have 2 unique reviewers (reviewer1, reviewer2) - dependabot excluded
+        assert result['reviewers_count'] == 2
+        # Should have 4 comments - code-bot comment excluded
+        assert result['review_comments_count'] == 4
+    
+    def test_compute_pr_review_depth_no_bots_config(self):
+        """Test review depth calculation with no bot patterns configured"""
+        config = {}  # No bots configuration
+        
+        pr_data = {
+            'reviews': [
+                {'user': {'login': 'reviewer1'}},
+                {'user': {'login': 'dependabot[bot]'}}  # Should be included when no bot patterns
+            ],
+            'review_comments': [
+                {'user': {'login': 'reviewer1'}},
+                {'user': {'login': 'dependabot[bot]'}}
+            ]
+        }
+        
+        result = compute_pr_review_depth(pr_data, config)
+        
+        # Should include all users when no bot patterns configured
+        assert result['reviewers_count'] == 2
+        assert result['review_comments_count'] == 2
+    
+    def test_compute_pr_review_depth_empty_data(self):
+        """Test review depth calculation with empty review data"""
+        config = {'bots': {'patterns': ['.*bot.*']}}
+        
+        pr_data = {
+            'reviews': [],
+            'review_comments': []
+        }
+        
+        result = compute_pr_review_depth(pr_data, config)
+        
+        assert result['reviewers_count'] == 0
+        assert result['review_comments_count'] == 0
+    
+    def test_compute_pr_review_depth_missing_data(self):
+        """Test review depth calculation with missing review data"""
+        config = {'bots': {'patterns': ['.*bot.*']}}
+        
+        pr_data = {}  # Missing reviews and review_comments keys
+        
+        result = compute_pr_review_depth(pr_data, config)
+        
+        assert result['reviewers_count'] == 0
+        assert result['review_comments_count'] == 0
+
+
+class TestReviewDepthStats:
+    """Test review depth statistics computation"""
+    
+    def test_compute_review_depth_stats_basic(self):
+        """Test basic review depth statistics computation"""
+        config = {'bots': {'patterns': ['.*bot.*']}}
+        
+        prs = [
+            {
+                'merged_at': '2025-01-15T16:30:00Z',
+                'reviews': [
+                    {'user': {'login': 'reviewer1'}},
+                    {'user': {'login': 'reviewer2'}}
+                ],
+                'review_comments': [
+                    {'user': {'login': 'reviewer1'}},
+                    {'user': {'login': 'reviewer1'}},
+                    {'user': {'login': 'reviewer2'}}
+                ]
+            },
+            {
+                'merged_at': '2025-01-16T12:00:00Z',
+                'reviews': [
+                    {'user': {'login': 'reviewer3'}}
+                ],
+                'review_comments': [
+                    {'user': {'login': 'reviewer3'}}
+                ]
+            },
+            {
+                'merged_at': '2025-01-17T08:00:00Z',
+                'reviews': [
+                    {'user': {'login': 'reviewer1'}},
+                    {'user': {'login': 'reviewer2'}},
+                    {'user': {'login': 'reviewer3'}}
+                ],
+                'review_comments': [
+                    {'user': {'login': 'reviewer1'}},
+                    {'user': {'login': 'reviewer2'}},
+                    {'user': {'login': 'reviewer3'}},
+                    {'user': {'login': 'reviewer1'}},
+                    {'user': {'login': 'reviewer2'}}
+                ]
+            }
+        ]
+        
+        stats = compute_review_depth_stats(prs, config)
+        
+        assert stats['count'] == 3
+        
+        # Reviewer counts: [2, 1, 3] -> median = 2.0
+        assert stats['median_reviewers'] == 2.0
+        assert stats['avg_reviewers'] == pytest.approx(2.0, rel=0.1)
+        
+        # Comment counts: [3, 1, 5] -> median = 3.0
+        assert stats['median_comments'] == 3.0
+        assert stats['avg_comments'] == pytest.approx(3.0, rel=0.1)
+    
+    def test_compute_review_depth_stats_filters_non_merged(self):
+        """Test that non-merged PRs are filtered out"""
+        config = {'bots': {'patterns': []}}
+        
+        prs = [
+            {
+                'merged_at': '2025-01-15T16:30:00Z',  # Merged PR
+                'reviews': [{'user': {'login': 'reviewer1'}}],
+                'review_comments': [{'user': {'login': 'reviewer1'}}]
+            },
+            {
+                'merged_at': None,  # Not merged - should be excluded
+                'reviews': [{'user': {'login': 'reviewer2'}}],
+                'review_comments': [{'user': {'login': 'reviewer2'}}]
+            }
+        ]
+        
+        stats = compute_review_depth_stats(prs, config)
+        
+        # Only the merged PR should be counted
+        assert stats['count'] == 1
+        assert stats['median_reviewers'] == 1.0
+        assert stats['median_comments'] == 1.0
+    
+    def test_compute_review_depth_stats_empty_prs(self):
+        """Test handling of empty PR list"""
+        config = {'bots': {'patterns': []}}
+        
+        stats = compute_review_depth_stats([], config)
+        
+        assert stats['count'] == 0
+        assert stats['median_reviewers'] == 0.0
+        assert stats['median_comments'] == 0.0
+        assert stats['avg_reviewers'] == 0.0
+        assert stats['avg_comments'] == 0.0
+    
+    def test_compute_review_depth_stats_excludes_bots(self):
+        """Test that bot users are properly excluded from statistics"""
+        config = {'bots': {'patterns': ['.*bot.*', 'dependabot']}}
+        
+        prs = [
+            {
+                'merged_at': '2025-01-15T16:30:00Z',
+                'reviews': [
+                    {'user': {'login': 'reviewer1'}},
+                    {'user': {'login': 'dependabot[bot]'}},  # Should be excluded
+                    {'user': {'login': 'reviewer2'}}
+                ],
+                'review_comments': [
+                    {'user': {'login': 'reviewer1'}},
+                    {'user': {'login': 'codecov-bot'}},  # Should be excluded
+                    {'user': {'login': 'reviewer2'}},
+                    {'user': {'login': 'reviewer2'}}
+                ]
+            }
+        ]
+        
+        stats = compute_review_depth_stats(prs, config)
+        
+        assert stats['count'] == 1
+        # Should have 2 reviewers (excluding dependabot)
+        assert stats['median_reviewers'] == 2.0
+        # Should have 3 comments (excluding codecov-bot)
+        assert stats['median_comments'] == 3.0

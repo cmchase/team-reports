@@ -35,7 +35,8 @@ states:
   active: ["In Progress", "Review"]  # States considered as active WIP
 
 # Bot accounts to filter out from reports
-bots: []
+bots:
+  patterns: []  # List of regex patterns to match bot usernames
 
 # Report generation settings
 report:
