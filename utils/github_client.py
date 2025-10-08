@@ -111,6 +111,44 @@ class GitHubApiClient:
             print(f"  ⚠️  Warning: Could not fetch review comments for PR #{pr_number}: {e}")
             return []
     
+    def _fetch_commits_from_merged_prs(self, repo: str, start_date: str, end_date: str) -> List[Dict]:
+        """Fetch commits from PRs that were merged in the date range."""
+        repo_path = self._build_repo_path(repo)
+        
+        # Get PRs that were merged in the date range
+        endpoint = f"repos/{repo_path}/pulls"
+        params = {
+            'state': 'closed',
+            'sort': 'updated',
+            'direction': 'desc'
+        }
+        
+        prs = self._make_request(endpoint, params)
+        
+        # Filter for PRs merged in the date range
+        start_dt = datetime.fromisoformat(f"{start_date}T00:00:00+00:00")
+        end_dt = datetime.fromisoformat(f"{end_date}T23:59:59+00:00")
+        
+        merged_prs = []
+        for pr in prs:
+            if pr.get('merged_at'):
+                merged_at = datetime.fromisoformat(pr['merged_at'].replace('Z', '+00:00'))
+                if start_dt <= merged_at <= end_dt:
+                    merged_prs.append(pr)
+        
+        # Fetch commits from each merged PR
+        all_commits = []
+        for pr in merged_prs:
+            try:
+                pr_commits_endpoint = f"repos/{repo_path}/pulls/{pr['number']}/commits"
+                time.sleep(0.1)  # Rate limiting
+                pr_commits = self._make_request(pr_commits_endpoint)
+                all_commits.extend(pr_commits)
+            except Exception as e:
+                print(f"  ⚠️  Warning: Could not fetch commits for merged PR #{pr['number']}: {e}")
+        
+        return all_commits
+    
     def _build_repo_path(self, repo: str) -> str:
         """Build full repository path with organization if configured."""
         return f"{self.github_org}/{repo}" if self.github_org else repo
@@ -138,6 +176,15 @@ class GitHubApiClient:
             end_dt = datetime.fromisoformat(f"{end_date}T23:59:59+00:00")
             
             if start_dt <= updated_at <= end_dt:
+                # Only include merged PRs for delivery reports
+                if not pr.get('merged_at'):
+                    continue  # Skip unmerged PRs
+                
+                # Check if the PR was actually merged in the date range  
+                merged_at = datetime.fromisoformat(pr['merged_at'].replace('Z', '+00:00'))
+                if not (start_dt <= merged_at <= end_dt):
+                    continue  # Skip PRs merged outside date range
+                
                 # Fetch detailed PR info for code metrics
                 try:
                     detailed_pr = self._fetch_pr_details(repo_path, pr['number'])
@@ -147,7 +194,7 @@ class GitHubApiClient:
                     pr['additions'] = 0
                     pr['deletions'] = 0
                     pr['changed_files'] = 0
-                
+
                 # Fetch reviews and review comments if review_depth is enabled
                 if self.config.get('metrics', {}).get('delivery', {}).get('review_depth', False):
                     pr['reviews'] = self._fetch_pr_reviews(repo_path, pr['number'])
@@ -155,7 +202,7 @@ class GitHubApiClient:
                 else:
                     pr['reviews'] = []
                     pr['review_comments'] = []
-                
+
                 filtered_prs.append(pr)
         
         return filtered_prs
@@ -171,7 +218,23 @@ class GitHubApiClient:
             'until': f"{end_date}T23:59:59Z"
         }
         
-        return self._make_request(endpoint, params)
+        # Fetch commits by commit date
+        commits_by_date = self._make_request(endpoint, params)
+        
+        # Also fetch commits from merged PRs in the date range (even if commit dates are outside range)
+        commits_from_prs = self._fetch_commits_from_merged_prs(repo, start_date, end_date)
+        
+        # Combine and deduplicate commits by SHA
+        all_commits = commits_by_date.copy()
+        existing_shas = {commit['sha'] for commit in commits_by_date}
+        
+        for commit in commits_from_prs:
+            if commit['sha'] not in existing_shas:
+                all_commits.append(commit)
+                existing_shas.add(commit['sha'])
+        
+        print(f"  📊 Found {len(commits_by_date)} commits by date, {len(commits_from_prs)} from merged PRs, {len(all_commits)} total")
+        return all_commits
     
     def fetch_issues(self, repo: str, start_date: str, end_date: str) -> List[Dict]:
         """Fetch issues for a repository in the date range."""
