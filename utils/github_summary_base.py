@@ -39,6 +39,17 @@ class GitHubSummaryBase:
         bot_patterns = self.config.get('bots', {}).get('patterns', [])
         return is_bot_user(github_username, bot_patterns)
     
+    def _get_pr_comment_count(self, pr: Dict[str, Any]) -> int:
+        """Get the number of review comments for a PR, excluding bots."""
+        from .github import compute_pr_review_depth
+        
+        # Only compute if review data is available
+        if not pr.get('review_comments'):
+            return 0
+            
+        depth_metrics = compute_pr_review_depth(pr, self.config)
+        return depth_metrics['review_comments_count']
+    
     def analyze_performance(self, all_data: Dict[str, Dict[str, List[Dict]]]) -> Dict[str, Any]:
         """Analyze GitHub activity data to extract performance metrics."""
         performance = {
@@ -258,21 +269,25 @@ class GitHubSummaryBase:
                 recent_prs = sorted(prs, key=lambda x: x['updated_at'], reverse=True)[:10]
             
             section.extend([
-                "| Repository | PR | State | Lines | Title |",
-                "|------------|-------|-------|--------|-------|"
+                "| Repository | PR | State | Lines | Comments | Title |",
+                "|------------|-------|-------|--------|----------|-------|"
             ])
             
             for pr in recent_prs:
                 title = pr['title'][:40 if report_type == "quarterly" else 60] + ("..." if len(pr['title']) > (40 if report_type == "quarterly" else 60) else "")
+                
+                # Calculate comment count (excluding bots)
+                comment_count = self._get_pr_comment_count(pr)
+                
                 if report_type == "quarterly":
                     state_emoji = "✅" if pr['state'] == 'closed' and pr['merged_at'] else "❌" if pr['state'] == 'closed' else "🔄"
                     additions = pr.get('additions', 0)
                     deletions = pr.get('deletions', 0)
                     lines_change = f"+{additions}/-{deletions}" if additions > 0 or deletions > 0 else "No data"
-                    section.append(f"| {pr['repo']} | [#{pr['number']}]({pr['url']}) | {state_emoji} {pr['state']} | {lines_change} | {title} |")
+                    section.append(f"| {pr['repo']} | [#{pr['number']}]({pr['url']}) | {state_emoji} {pr['state']} | {lines_change} | {comment_count} | {title} |")
                 else:
                     lines = f"+{pr.get('additions', 0)}/-{pr.get('deletions', 0)}"
-                    section.append(f"| {pr['repo']} | [#{pr['number']}]({pr['url']}) | {pr['state']} | {lines} | {title} |")
+                    section.append(f"| {pr['repo']} | [#{pr['number']}]({pr['url']}) | {pr['state']} | {lines} | {comment_count} | {title} |")
             section.append("")
 
         # Recent Commits (show top 3)

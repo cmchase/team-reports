@@ -635,7 +635,9 @@ def generate_review_depth_analysis(
         # Summary statistics
         section += f"**📈 Review Engagement**\n"
         section += f"- **Median Reviewers per PR:** {stats['median_reviewers']:.1f}\n"
-        section += f"- **Median Comments per PR:** {stats['median_comments']:.1f}\n\n"
+        section += f"- **Average Reviewers per PR:** {stats['avg_reviewers']:.1f}\n"
+        section += f"- **Median Comments per PR:** {stats['median_comments']:.1f}\n"
+        section += f"- **Average Comments per PR:** {stats['avg_comments']:.1f}\n\n"
         
         return section
         
