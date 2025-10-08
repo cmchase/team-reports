@@ -226,7 +226,7 @@ def compute_pr_lead_time_with_commits(pr: Dict[str, Any], github_token: str,
         return compute_pr_lead_time_hours(pr)
 
 
-def compute_pr_lead_time_stats(prs: List[Dict[str, Any]], min_lines_changed: int = 5) -> Dict[str, Any]:
+def compute_pr_lead_time_stats(prs: List[Dict[str, Any]], min_lines_changed: int = 5, config: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Compute lead time statistics for a list of PRs.
     
@@ -245,9 +245,17 @@ def compute_pr_lead_time_stats(prs: List[Dict[str, Any]], min_lines_changed: int
     lead_times = []
     qualifying_prs = []
     
+    # Get bot patterns for filtering
+    bot_patterns = config.get('bots', {}).get('patterns', []) if config else []
+    
     for pr in prs:
         # Skip if not merged
         if not pr.get('merged_at'):
+            continue
+            
+        # Skip bot PRs
+        author_login = pr.get('user', {}).get('login', 'Unknown')
+        if author_login != 'Unknown' and is_bot_user(author_login, bot_patterns):
             continue
             
         # Filter trivial PRs based on lines changed
@@ -265,7 +273,7 @@ def compute_pr_lead_time_stats(prs: List[Dict[str, Any]], min_lines_changed: int
             qualifying_prs.append({
                 'number': pr['number'],
                 'title': pr['title'],
-                'author': pr.get('user', {}).get('login', 'Unknown'),
+                'author': author_login,
                 'url': pr['html_url'],
                 'lead_time_hours': lead_time,
                 'additions': additions,
@@ -388,7 +396,7 @@ def generate_pr_lead_time_analysis(
         all_prs = github_client.get_merged_prs_for_lead_time(start_date, end_date, all_prs_data)
         
         # Compute lead time statistics
-        stats = compute_pr_lead_time_stats(all_prs, min_lines_changed)
+        stats = compute_pr_lead_time_stats(all_prs, min_lines_changed, config)
         
         if stats['count'] == 0:
             if report_type == "quarterly":
@@ -493,7 +501,7 @@ def _generate_quarterly_monthly_breakdown(all_prs: List[Dict], year: int, quarte
                     month_prs.append(pr)
         
         if month_prs:
-            month_stat = compute_pr_lead_time_stats(month_prs, min_lines_changed)
+            month_stat = compute_pr_lead_time_stats(month_prs, min_lines_changed, {})
             if month_stat['count'] > 0:
                 monthly_stats[month] = month_stat
     

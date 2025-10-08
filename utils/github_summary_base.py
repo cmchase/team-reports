@@ -11,7 +11,7 @@ from collections import defaultdict
 from datetime import datetime
 
 from .github_client import GitHubApiClient
-from .github import generate_pr_lead_time_analysis
+from .github import generate_pr_lead_time_analysis, is_bot_user
 
 
 class GitHubSummaryBase:
@@ -32,6 +32,13 @@ class GitHubSummaryBase:
         team_members = self.config.get('team_members', {})
         return team_members.get(github_username, github_username)
     
+    def _is_bot_contributor(self, github_username: str) -> bool:
+        """Check if a GitHub username matches any configured bot patterns."""
+        if not github_username:
+            return False
+        bot_patterns = self.config.get('bots', {}).get('patterns', [])
+        return is_bot_user(github_username, bot_patterns)
+    
     def analyze_performance(self, all_data: Dict[str, Dict[str, List[Dict]]]) -> Dict[str, Any]:
         """Analyze GitHub activity data to extract performance metrics."""
         performance = {
@@ -50,7 +57,13 @@ class GitHubSummaryBase:
         # Process pull requests
         for repo, prs in all_data['pull_requests'].items():
             for pr in prs:
-                author = self._get_contributor_name(pr.get('user', {}).get('login', 'Unknown'))
+                author_login = pr.get('user', {}).get('login', 'Unknown')
+                
+                # Skip bot contributors
+                if self._is_bot_contributor(author_login):
+                    continue
+                    
+                author = self._get_contributor_name(author_login)
                 performance['contributor_prs'][author].append({
                     'repo': repo,
                     'title': pr['title'],
@@ -78,7 +91,13 @@ class GitHubSummaryBase:
         for repo, commits in all_data['commits'].items():
             for commit in commits:
                 author_info = commit.get('author') or commit.get('commit', {}).get('author', {})
-                author = self._get_contributor_name(author_info.get('login') or author_info.get('name', 'Unknown'))
+                author_login = author_info.get('login') or author_info.get('name', 'Unknown')
+                
+                # Skip bot contributors
+                if self._is_bot_contributor(author_login):
+                    continue
+                    
+                author = self._get_contributor_name(author_login)
                 
                 performance['contributor_commits'][author].append({
                     'repo': repo,
@@ -98,7 +117,13 @@ class GitHubSummaryBase:
         # Process issues
         for repo, issues in all_data['issues'].items():
             for issue in issues:
-                author = self._get_contributor_name(issue.get('user', {}).get('login', 'Unknown'))
+                author_login = issue.get('user', {}).get('login', 'Unknown')
+                
+                # Skip bot contributors
+                if self._is_bot_contributor(author_login):
+                    continue
+                    
+                author = self._get_contributor_name(author_login)
                 performance['contributor_issues'][author].append({
                     'repo': repo,
                     'title': issue['title'],
