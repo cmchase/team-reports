@@ -107,24 +107,7 @@ class QuarterlyTeamSummary(JiraSummaryBase):
             ""
         ]
         
-        # Add top contributors by ticket count
-        if performance['contributor_counts']:
-            overview.append("#### 🏆 Top Contributors by Ticket Count & Story Points")
-            # Sort contributors by ticket count and show all (or top 15 if too many)
-            top_contributors = sorted(performance['contributor_counts'].items(), 
-                                    key=lambda x: x[1], reverse=True)
-            
-            # Show all contributors if reasonable number, otherwise limit to top 15
-            display_count = min(15, len(top_contributors))
-            for i, (contributor, count) in enumerate(top_contributors[:display_count], 1):
-                percentage = (count / total_tickets * 100) if total_tickets > 0 else 0
-                story_points = performance['contributor_story_points'][contributor]
-                sp_percentage = (story_points / total_story_points * 100) if total_story_points > 0 else 0
-                overview.append(f"{i}. **{contributor}:** {count} tickets ({percentage:.1f}%) • {story_points} Points ({sp_percentage:.1f}%)")
-            
-            if len(top_contributors) > display_count:
-                overview.append(f"*... and {len(top_contributors) - display_count} more contributors*")
-            overview.append("")
+        overview.append("")
         
         # Add monthly activity trend if data is available
         if performance['monthly_activity']:

@@ -431,7 +431,6 @@ All reports are generated in clean Markdown format with rich formatting, tables,
 - **💻 Commit Tracking** - Individual contributor commit activity
 - **🐛 Issue Updates** - Issues created, updated, and closed during the week
 - **📊 Daily Activity Patterns** - Day-by-day breakdown of development activity
-- **🏆 Top Contributors** - Weekly recognition with contribution metrics
 - **📁 Repository Breakdown** - Activity across multiple repositories
 
 **Example Output:**
@@ -445,10 +444,6 @@ All reports are generated in clean Markdown format with rich formatting, tables,
 - **Lines Added:** +2,847
 - **Lines Removed:** -1,234
 - **Active Contributors:** 8
-
-#### 🏆 Top Contributors This Week
-**1. Jane Smith** - 8 PRs, 19 commits, +847/-203 lines
-**2. John Doe** - 5 PRs, 15 commits, +623/-98 lines
 
 ## 👥 INDIVIDUAL CONTRIBUTOR DETAILS
 ### 👤 Jane Smith
@@ -468,7 +463,6 @@ All reports are generated in clean Markdown format with rich formatting, tables,
 - **👥 Individual Contributor Analysis** - Detailed performance per team member
 - **📊 Story Point Tracking** - Completion metrics and productivity analysis
 - **📈 Trend Analysis** - Quarter-over-quarter performance insights
-- **🏆 Top Contributors** - Recognition of high-performing team members
 - **📋 Comprehensive Ticket Lists** - All tickets with detailed categorization
 
 **Example Output:**
@@ -478,11 +472,11 @@ All reports are generated in clean Markdown format with rich formatting, tables,
 ## 📈 EXECUTIVE SUMMARY  
 - **Total Tickets Completed:** 342
 - **Total Story Points:** 1,247
-- **Top Contributor:** Jane Smith (89 tickets, 276 story points)
+- **Active Contributors:** 8 team members
 - **Most Active Category:** Backend Development (156 tickets)
 
 ## 👥 INDIVIDUAL CONTRIBUTOR PERFORMANCE
-### 🏆 Jane Smith
+### 👤 Jane Smith
 - **Tickets Completed:** 89 tickets
 - **Story Points:** 276 points  
 - **Average per Month:** 29.7 tickets, 92 story points
@@ -508,7 +502,7 @@ All reports are generated in clean Markdown format with rich formatting, tables,
 - **Lines Added:** +12,847
 - **Lines Removed:** -8,234
 
-## 🏆 TOP CONTRIBUTORS  
+## 👥 CONTRIBUTOR SUMMARY  
 | Contributor | PRs | Commits | Lines + | Lines - |
 |-------------|-----|---------|---------|---------|
 | Jane Smith | 34 | 89 | +3,421 | -1,876 |

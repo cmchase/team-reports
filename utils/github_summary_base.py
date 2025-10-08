@@ -178,33 +178,6 @@ class GitHubSummaryBase:
         
         overview.append("")
         
-        # Add top contributors
-        if total_contributors > 0:
-            if report_type == "quarterly":
-                overview.append("#### 🏆 Top Contributors by Pull Requests")
-                top_contributors = sorted(performance['contributor_pr_counts'].items(), 
-                                       key=lambda x: x[1], reverse=True)[:15]
-                
-                for i, (contributor, count) in enumerate(top_contributors, 1):
-                    percentage = (count / total_prs * 100) if total_prs > 0 else 0
-                    commits = performance['contributor_commit_counts'].get(contributor, 0)
-                    issues = performance['contributor_issue_counts'].get(contributor, 0)
-                    lines_added = performance['contributor_lines_added'].get(contributor, 0)
-                    overview.append(f"{i}. **{contributor}:** {count} PRs ({percentage:.1f}%) • {commits} commits • {issues} issues • +{lines_added:,} lines")
-            else:  # weekly
-                overview.append("#### 🏆 Top Contributors This Week")
-                top_contributors = sorted(performance['contributor_pr_counts'].items(), 
-                                       key=lambda x: x[1], reverse=True)[:5]
-                
-                for i, (contributor, count) in enumerate(top_contributors, 1):
-                    commits = performance['contributor_commit_counts'].get(contributor, 0)
-                    lines_added = performance['contributor_lines_added'].get(contributor, 0)
-                    lines_removed = performance['contributor_lines_removed'].get(contributor, 0)
-                    overview.append(f"**{i}. {contributor}** - {count} PRs, {commits} commits, +{lines_added}/-{lines_removed} lines")
-                    overview.append("")
-            
-            overview.append("")
-        
         return overview
     
     def generate_repository_summary(self, performance: Dict[str, Any]) -> List[str]:

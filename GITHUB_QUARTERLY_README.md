@@ -135,10 +135,6 @@ Reports/github_quarterly_summary_Q4_2025.md
 - **Lines Removed:** 8,901
 - **Active Contributors:** 8
 
-#### 🏆 Top Contributors by Pull Requests
-1. **John Doe:** 12 PRs (26.7%) • 89 commits • 5 issues • +3,456 lines
-2. **Jane Smith:** 10 PRs (22.2%) • 67 commits • 8 issues • +2,890 lines
-
 ## 👥 INDIVIDUAL CONTRIBUTOR DETAILS
 
 ### 👤 John Doe
