@@ -86,7 +86,9 @@ class GitHubSummaryBase:
                     'url': pr['html_url'],
                     'additions': pr.get('additions', 0),
                     'deletions': pr.get('deletions', 0),
-                    'changed_files': pr.get('changed_files', 0)
+                    'changed_files': pr.get('changed_files', 0),
+                    'reviews': pr.get('reviews', []),
+                    'review_comments': pr.get('review_comments', [])
                 })
                 performance['contributor_pr_counts'][author] += 1
                 performance['contributor_lines_added'][author] += pr.get('additions', 0)
