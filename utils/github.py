@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 import statistics
 import re
+from .report import footnote
 
 
 def is_bot_user(username: str, bot_patterns: List[str]) -> bool:
@@ -385,7 +386,7 @@ def generate_pr_lead_time_analysis(
         
         if not repositories:
             title = "Weekly" if report_type == "weekly" else f"Q{quarter} {year} Quarterly"
-            return f"\n\n### 🚀 Delivery • {title} PR Lead Time\n\n*No repositories configured for analysis*\n"
+            return f"\n\n### 🚀 Delivery • {title} PR Lead Time{footnote('†', 'pr-lead-time')}\n\n*No repositories configured for analysis*\n"
         
         print(f"🚀 Computing {report_type} PR lead time analysis...")
         
@@ -400,17 +401,17 @@ def generate_pr_lead_time_analysis(
         
         if stats['count'] == 0:
             if report_type == "quarterly":
-                return f"\n\n### 🚀 Delivery • Quarterly PR Lead Time\n\n*No merged PRs with ≥{min_lines_changed} lines changed found in Q{quarter} {year}*\n"
+                return f"\n\n### 🚀 Delivery • Quarterly PR Lead Time{footnote('†', 'pr-lead-time')}\n\n*No merged PRs with ≥{min_lines_changed} lines changed found in Q{quarter} {year}*\n"
             else:
-                return f"\n\n### 🚀 Delivery • PR Lead Time\n\n*No merged PRs with ≥{min_lines_changed} lines changed found in this period*\n"
+                return f"\n\n### 🚀 Delivery • PR Lead Time{footnote('†', 'pr-lead-time')}\n\n*No merged PRs with ≥{min_lines_changed} lines changed found in this period*\n"
         
         # Build the section header based on report type
         if report_type == "quarterly":
-            section = f"\n\n### 🚀 Delivery • Quarterly PR Lead Time\n\n"
+            section = f"\n\n### 🚀 Delivery • Quarterly PR Lead Time{footnote('†', 'pr-lead-time')}\n\n"
             section += f"**Analysis Period:** Q{quarter} {year} ({start_date} to {end_date})\n"
             section += f"**Merged PRs Analyzed:** {stats['count']} PRs (≥{min_lines_changed} lines changed)\n\n"
         else:
-            section = f"\n\n### 🚀 Delivery • PR Lead Time\n\n"
+            section = f"\n\n### 🚀 Delivery • PR Lead Time{footnote('†', 'pr-lead-time')}\n\n"
             section += f"**Merged PRs Analyzed:** {stats['count']} PRs (≥{min_lines_changed} lines changed)\n\n"
         
         # Summary statistics (common to both report types)
@@ -461,7 +462,7 @@ def generate_pr_lead_time_analysis(
         
     except Exception as e:
         error_title = "Quarterly PR Lead Time" if report_type == "quarterly" else "PR Lead Time"
-        return f"\n\n### 🚀 Delivery • {error_title}\n\n*Error computing PR lead time analysis: {e}*\n"
+        return f"\n\n### 🚀 Delivery • {error_title}{footnote('†', 'pr-lead-time')}\n\n*Error computing PR lead time analysis: {e}*\n"
 
 
 def _generate_quarterly_monthly_breakdown(all_prs: List[Dict], year: int, quarter: int, 
@@ -607,7 +608,7 @@ def generate_review_depth_analysis(
         repositories = config.get('repositories', [])
         
         if not repositories:
-            return f"\n\n### 📊 Delivery • Review Depth\n\n*No repositories configured for analysis*\n"
+            return f"\n\n### 📊 Delivery • Review Depth{footnote('†', 'review-depth')}\n\n*No repositories configured for analysis*\n"
         
         print(f"📊 Computing {report_type} review depth analysis...")
         
@@ -626,10 +627,10 @@ def generate_review_depth_analysis(
         stats = compute_review_depth_stats(all_prs, config)
         
         if stats['count'] == 0:
-            return f"\n\n### 📊 Delivery • Review Depth\n\n*No merged PRs found in this period*\n"
+            return f"\n\n### 📊 Delivery • Review Depth{footnote('†', 'review-depth')}\n\n*No merged PRs found in this period*\n"
         
         # Build the section
-        section = f"\n\n### 📊 Delivery • Review Depth\n\n"
+        section = f"\n\n### 📊 Delivery • Review Depth{footnote('†', 'review-depth')}\n\n"
         section += f"**Merged PRs Analyzed:** {stats['count']} PRs\n\n"
         
         # Summary statistics
@@ -642,4 +643,4 @@ def generate_review_depth_analysis(
         return section
         
     except Exception as e:
-        return f"\n\n### 📊 Delivery • Review Depth\n\n*Error computing review depth analysis: {e}*\n"
+        return f"\n\n### 📊 Delivery • Review Depth{footnote('†', 'review-depth')}\n\n*Error computing review depth analysis: {e}*\n"

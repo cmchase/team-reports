@@ -531,3 +531,68 @@ def render_active_config(config: Dict[str, Any]) -> str:
 """
     
     return markdown
+
+
+def footnote(symbol: str = "†", anchor: str = "") -> str:
+    """
+    Generate a footnote link marker for section headers.
+    
+    Args:
+        symbol: The footnote symbol to display (default: "†")
+        anchor: The glossary anchor to link to (e.g., "cycle-time")
+        
+    Returns:
+        str: Markdown footnote link
+        
+    Example:
+        header = f"### 📊 Cycle Time{footnote('†', 'cycle-time')}"
+        # Returns: "### 📊 Cycle Time[†](#cycle-time)"
+    """
+    if not anchor:
+        return symbol
+    return f"[{symbol}](#{anchor})"
+
+
+def render_glossary(entries: Dict[str, str]) -> str:
+    """
+    Render a glossary section from metric definitions.
+    
+    Args:
+        entries: Dictionary mapping metric names to their definitions
+                Example: {"Cycle Time": "First 'In Progress' → Done."}
+        
+    Returns:
+        str: Markdown glossary section
+        
+    The glossary uses anchor links that match the footnote system:
+        - Metric names are converted to kebab-case for anchors
+        - Each entry is formatted as a definition list item
+        
+    Example:
+        glossary_md = render_glossary({
+            "Cycle Time": "First 'In Progress' → Done.",
+            "PR Lead Time": "First commit → merge."
+        })
+    """
+    if not entries:
+        return ""
+    
+    def to_anchor(name: str) -> str:
+        """Convert metric name to kebab-case anchor."""
+        return name.lower().replace(' ', '-').replace('/', '-')
+    
+    glossary_lines = [
+        "## 📚 Glossary",
+        ""
+    ]
+    
+    # Sort entries alphabetically for consistency
+    for name in sorted(entries.keys()):
+        definition = entries[name]
+        anchor = to_anchor(name)
+        glossary_lines.extend([
+            f"**<a id=\"{anchor}\"></a>{name}:** {definition}",
+            ""
+        ])
+    
+    return "\n".join(glossary_lines)

@@ -30,7 +30,7 @@ from jira import JIRA
 from utils.jira import fetch_tickets_with_changelog, compute_cycle_time_days, compute_cycle_time_stats
 from utils.date import parse_date_args as parse_date_args_util
 from utils.config import load_config, get_config
-from utils.report import create_summary_report, save_report, generate_filename, render_active_config
+from utils.report import create_summary_report, save_report, generate_filename, render_active_config, footnote, render_glossary
 from utils.jira_summary_base import JiraSummaryBase
 
 # Load environment variables
@@ -151,7 +151,7 @@ def generate_wip_analysis(config: Dict[str, Any],
             tickets = jira_client.search_issues(jql, maxResults=max_results, expand='changelog')
         
         if not tickets:
-            return f"\n\n### 📊 Flow • Work in Progress (WIP)\n\n*No active tickets found in states: {', '.join(active_states)}*\n"
+            return f"\n\n### 📊 Flow • Work in Progress (WIP){footnote('†', 'wip')}\n\n*No active tickets found in states: {', '.join(active_states)}*\n"
         
         # Count WIP by engineer
         wip_by_engineer = {}
@@ -167,7 +167,7 @@ def generate_wip_analysis(config: Dict[str, Any],
         
         # Build report section
         total_wip = sum(wip_by_engineer.values()) + unassigned_count
-        section = f"\n\n### 📊 Flow • Work in Progress (WIP)\n\n"
+        section = f"\n\n### 📊 Flow • Work in Progress (WIP){footnote('†', 'wip')}\n\n"
         section += f"**Current WIP:** {total_wip} tickets • **Threshold:** {wip_threshold} per engineer\n\n"
         
         if wip_by_engineer or unassigned_count > 0:
@@ -203,7 +203,7 @@ def generate_wip_analysis(config: Dict[str, Any],
         return section
         
     except Exception as e:
-        return f"\n\n### 📊 Flow • Work in Progress (WIP)\n\n*Error computing WIP analysis: {e}*\n"
+        return f"\n\n### 📊 Flow • Work in Progress (WIP){footnote('†', 'wip')}\n\n*Error computing WIP analysis: {e}*\n"
 
 
 def generate_cycle_time_analysis(config: Dict[str, Any], start_date: str, end_date: str,
@@ -243,7 +243,7 @@ def generate_cycle_time_analysis(config: Dict[str, Any], start_date: str, end_da
             tickets = fetch_tickets_with_changelog(jira_client, jql, max_results)
         
         if not tickets:
-            return "\n\n### ⏱️ Flow • Cycle Time\n\n*No tickets found for cycle time analysis.*\n"
+            return f"\n\n### ⏱️ Flow • Cycle Time{footnote('†', 'cycle-time')}\n\n*No tickets found for cycle time analysis.*\n"
         
         # Get states configuration
         states_done = config.get('status_filters', {}).get('completed', ['Closed', 'Done'])
@@ -264,7 +264,7 @@ def generate_cycle_time_analysis(config: Dict[str, Any], start_date: str, end_da
                 })
         
         if not cycle_data:
-            return "\n\n### ⏱️ Flow • Cycle Time\n\n*No completed tickets with full cycle time data found.*\n"
+            return f"\n\n### ⏱️ Flow • Cycle Time{footnote('†', 'cycle-time')}\n\n*No completed tickets with full cycle time data found.*\n"
         
         # Compute statistics
         cycle_times = [item['cycle_time'] for item in cycle_data]
@@ -274,7 +274,7 @@ def generate_cycle_time_analysis(config: Dict[str, Any], start_date: str, end_da
         sorted_data = sorted(cycle_data, key=lambda x: x['cycle_time'])
         
         # Build report section
-        section = f"\n\n### ⏱️ Flow • Cycle Time\n\n"
+        section = f"\n\n### ⏱️ Flow • Cycle Time{footnote('†', 'cycle-time')}\n\n"
         section += f"**{len(cycle_data)} tickets analyzed** • "
         section += f"**Average: {stats['avg']} days** • "
         section += f"**Median: {stats['median']} days** • "
@@ -305,7 +305,7 @@ def generate_cycle_time_analysis(config: Dict[str, Any], start_date: str, end_da
         return section
         
     except Exception as e:
-        return f"\n\n### ⏱️ Flow • Cycle Time\n\n*Error computing cycle time: {e}*\n"
+        return f"\n\n### ⏱️ Flow • Cycle Time{footnote('†', 'cycle-time')}\n\n*Error computing cycle time: {e}*\n"
 
 def main():
     """Main function"""
@@ -399,6 +399,21 @@ def main():
         # TODO: Future metrics sections (Phase 2+)
         # if enable_blocked_time:
         #     report += generate_blocked_time_analysis(tickets, start_date, end_date)
+        
+        # Add footer before glossary/configuration
+        report += "\n\n---\n\n"
+        
+        # Add glossary if any metrics are enabled
+        glossary_entries = {}
+        if enable_cycle_time:
+            glossary_entries["Cycle Time"] = "First 'In Progress' → Done."
+        if enable_wip:
+            glossary_entries["WIP"] = "Tickets currently in active states."
+        # Future: if enable_blocked_time: glossary_entries["Blocked Time"] = "Elapsed time in blocked states."
+        
+        if glossary_entries:
+            glossary_section = render_glossary(glossary_entries)
+            report += glossary_section + "\n"
         
         # Append active configuration block
         config_block = render_active_config(config)

@@ -24,7 +24,7 @@ sys.path.insert(0, '.')
 from dotenv import load_dotenv
 from utils.date import parse_date_args, get_current_week
 from utils.config import load_config, get_config
-from utils.report import ensure_reports_directory, save_report, generate_filename, render_active_config
+from utils.report import ensure_reports_directory, save_report, generate_filename, render_active_config, render_glossary
 from utils.github import generate_pr_lead_time_analysis, generate_review_depth_analysis
 from utils.github_summary_base import GitHubSummaryBase
 
@@ -126,8 +126,19 @@ def main():
             )
             report += review_depth_section
         
-        # Add footer before configuration
+        # Add footer before glossary/configuration
         report += "\n\n---\n\n"
+        
+        # Add glossary if any metrics are enabled
+        glossary_entries = {}
+        if flag("metrics.delivery.pr_lead_time"):
+            glossary_entries["PR Lead Time"] = "First commit → merge."
+        if flag("metrics.delivery.review_depth"):
+            glossary_entries["Review Depth"] = "Reviewers per PR and review comments."
+        
+        if glossary_entries:
+            glossary_section = render_glossary(glossary_entries)
+            report += glossary_section + "\n"
         
         # Add configuration information if enabled
         config_flag = flag("report.show_active_config")

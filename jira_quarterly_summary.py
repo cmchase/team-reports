@@ -26,7 +26,7 @@ from jira import JIRA
 from utils.jira import fetch_tickets_with_changelog, compute_cycle_time_days, compute_cycle_time_stats
 from utils.date import get_current_quarter, get_quarter_range, parse_quarter_from_date
 from utils.config import load_config, get_config
-from utils.report import generate_filename, save_report, ensure_reports_directory, render_active_config
+from utils.report import generate_filename, save_report, ensure_reports_directory, render_active_config, footnote, render_glossary
 from utils.jira_summary_base import JiraSummaryBase
 
 # Load environment variables
@@ -415,6 +415,20 @@ def main():
         # if enable_blocked_time:
         #     report += generate_quarterly_blocked_time_trends(tickets, year, quarter)
         
+        # Add footer before glossary/configuration
+        report += "\n\n---\n\n"
+        
+        # Add glossary if any metrics are enabled
+        glossary_entries = {}
+        if enable_cycle_time:
+            glossary_entries["Cycle Time"] = "First 'In Progress' → Done."
+        # Future: if enable_wip: glossary_entries["WIP"] = "Tickets currently in active states."
+        # Future: if enable_blocked_time: glossary_entries["Blocked Time"] = "Elapsed time in blocked states."
+        
+        if glossary_entries:
+            glossary_section = render_glossary(glossary_entries)
+            report += glossary_section + "\n"
+        
         # Append active configuration block
         config_block = render_active_config(config)
         full_report = report + config_block
@@ -478,7 +492,7 @@ def generate_quarterly_cycle_time_analysis(config: Dict[str, Any], year: int, qu
             tickets = fetch_tickets_with_changelog(jira_client, jql, max_results)
         
         if not tickets:
-            return f"\n\n### ⏱️ Flow • Quarterly Cycle Time Trends\n\n*No tickets found for Q{quarter} {year} cycle time analysis.*\n"
+            return f"\n\n### ⏱️ Flow • Quarterly Cycle Time Trends{footnote('†', 'cycle-time')}\n\n*No tickets found for Q{quarter} {year} cycle time analysis.*\n"
         
         # Get states configuration
         states_done = config.get('status_filters', {}).get('completed', ['Closed', 'Done'])
@@ -492,13 +506,13 @@ def generate_quarterly_cycle_time_analysis(config: Dict[str, Any], year: int, qu
                 cycle_times.append(cycle_time)
         
         if not cycle_times:
-            return f"\n\n### ⏱️ Flow • Quarterly Cycle Time Trends\n\n*No completed tickets with full cycle time data found for Q{quarter} {year}.*\n"
+            return f"\n\n### ⏱️ Flow • Quarterly Cycle Time Trends{footnote('†', 'cycle-time')}\n\n*No completed tickets with full cycle time data found for Q{quarter} {year}.*\n"
         
         # Compute overall statistics
         stats = compute_cycle_time_stats(cycle_times)
         
         # Build report section
-        section = f"\n\n### ⏱️ Flow • Quarterly Cycle Time Trends\n\n"
+        section = f"\n\n### ⏱️ Flow • Quarterly Cycle Time Trends{footnote('†', 'cycle-time')}\n\n"
         section += f"**Q{quarter} {year} Summary:** {len(cycle_times)} tickets completed • "
         section += f"**Average: {stats['avg']} days** • "
         section += f"**Median: {stats['median']} days** • "
@@ -528,7 +542,7 @@ def generate_quarterly_cycle_time_analysis(config: Dict[str, Any], year: int, qu
         return section
         
     except Exception as e:
-        return f"\n\n### ⏱️ Flow • Quarterly Cycle Time Trends\n\n*Error computing quarterly cycle time: {e}*\n"
+        return f"\n\n### ⏱️ Flow • Quarterly Cycle Time Trends{footnote('†', 'cycle-time')}\n\n*Error computing quarterly cycle time: {e}*\n"
 
 
 # Script entry point - only run if this file is executed directly
