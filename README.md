@@ -832,69 +832,8 @@ logging.basicConfig(level=logging.DEBUG)
 
 ## 🗺️ Roadmap & Future Vision
 
-Team Reports is designed to evolve from basic automation to a comprehensive **team insights platform**. Our roadmap transforms development data into actionable intelligence for engineering leaders and teams.
-
-### 🚀 **Current Capabilities (Phase 1)**
-- ✅ **Complete Reporting Suite**: Weekly and quarterly reports for both Jira and GitHub
-- ✅ **Multi-Platform Integration**: Unified configuration and time-aligned analysis
-- ✅ **Smart Categorization**: Flexible filtering and customizable team structures
-- ✅ **Enterprise-Ready**: Secure, scalable, and professionally documented
-
-### 🔥 **Next Phase Highlights**
-- **Flow & Delivery Metrics**: Cycle time, WIP tracking, PR lead time analysis
-- **Coaching Insights**: Growth signals and correlation analysis for team development  
-- **Data Quality**: Automated validation with Pass/Warn/Fail indicators
-- **Advanced Analytics**: Trend analysis, predictive insights, and CSV exports
-
-### 🎯 **Strategic Vision**
-Transform Team Reports into a platform that empowers engineering teams to **see their progress, friction, and growth patterns** through meaningful insights derived from everyday development activities.
-
-## 📋 **[→ View Complete Roadmap](ROADMAP.md)**
-
-Our detailed roadmap outlines **6 development phases** with specific features, timelines, and implementation strategies. See [ROADMAP.md](ROADMAP.md) for:
-
-- **Detailed feature specifications** for each development phase
-- **Implementation strategies** and technical requirements
-- **Priority matrix** with High/Medium/Future classifications  
-- **Contribution guidelines** for developers interested in building these features
-
-**What's Next?** Check the roadmap for high-priority items I'm looking to implement
+See [ROADMAP.md](ROADMAP.md)
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🎉 Success!
-
-Your comprehensive Team Reports suite is now ready to use! You can:
-
-### 📊 Multi-Platform Reporting
-- ✅ **Generate weekly Jira summaries** for sprint reviews and team standups
-- ✅ **Create weekly GitHub reports** for code contribution and sprint demo insights  
-- ✅ **Produce quarterly Jira analysis** for performance reviews and planning
-- ✅ **Generate GitHub quarterly reports** for long-term code contribution analysis
-- ✅ **Generate complementary reports** from both Jira tickets and GitHub contributions for the same time periods
-
-### 🚀 Advanced Capabilities  
-- ✅ **Smart ticket categorization** with customizable rules and filters
-- ✅ **Individual contributor tracking** with detailed performance metrics
-- ✅ **Cross-repository analysis** for complete development visibility  
-- ✅ **Rich Markdown output** with tables, links, and visual indicators
-- ✅ **Automated execution** via convenient shell scripts
-- ✅ **Extensible architecture** using modular utilities package
-- ✅ **Time-aligned reporting** enabling side-by-side analysis of Jira and GitHub activities
-
-### 🛠️ Enterprise Ready
-- ✅ **Secure credential management** with environment variables
-- ✅ **Comprehensive configuration** for different team structures
-- ✅ **Robust error handling** and API rate limiting
-- ✅ **Detailed documentation** for users and developers
-- ✅ **Scalable design** for teams of any size
-
-**Start generating reports and transform your team's development data into actionable insights!** 🚀
-
-Choose your report type:
-- `./run_jira_weekly_summary.sh` for Jira sprint insights
-- `./run_github_weekly_summary.sh` for GitHub sprint insights
-- `./run_jira_quarterly_summary.sh` for Jira performance analysis  
-- `./run_github_quarterly_summary.sh` for GitHub contribution tracking
