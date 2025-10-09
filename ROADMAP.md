@@ -11,18 +11,28 @@ All new features maintain the same **Markdown-only**, **configuration-driven**, 
 - ✅ **Configuration Management** – Layered YAML system with validation and environment overrides
 - ✅ **Feature Flag Infrastructure** – Per-metric flags wired across all report generators  
 - ✅ **Active Configuration Display** – Hash-based config tracking with automatic secret redaction
-- ✅ **Comprehensive Testing** – 146+ unit tests with CI-ready foundation
+- ✅ **Comprehensive Testing** – 241+ unit tests with CI-ready foundation
 - ✅ **Batch Processing System** – Source-agnostic batch weekly report generation for multiple weeks
 - ✅ **Flow Metrics Implementation** – Cycle time and WIP metrics with configurable thresholds
 - ✅ **Report Quality Improvements** – Enhanced table formatting and full title display
 
-**Ready for implementation:** GitHub delivery metrics (PR lead time, review depth) and blocked time tracking for Jira.
+**Major delivery metrics completed (October 2025):**
+- ✅ **GitHub PR Lead Time** – Duration from first commit → merge, with trivial PR filtering
+- ✅ **GitHub Review Depth** – Reviewers per PR, review comments, bot exclusion via regex patterns
+- ✅ **Report Glossary System** – Footnote markers (†) linking to metric definitions
+- ✅ **Enhanced PR Analysis** – Individual PR tables now include comment counts per PR
+- ✅ **Data Quality Fixes** – Resolved PR processing issues, improved merged PR filtering
+
+**Ready for implementation:** Blocked time tracking for Jira.
 
 **Key learnings from recent implementation:**
 - Batch processing significantly improves productivity for historical analysis and backfill scenarios
 - Feature flag infrastructure allows safe rollout of new metrics without affecting existing workflows  
 - Configuration-driven approach enables easy customization per team without code changes
 - Comprehensive testing prevents regressions and ensures reliability at scale
+- Bot exclusion via regex patterns is essential for accurate review metrics in automated environments
+- Glossary systems with clickable footnotes significantly improve metric comprehension and adoption
+- Data quality issues (like unmerged PRs) require careful filtering to avoid misleading "impossible" statistics
 
 ---
 
@@ -50,7 +60,12 @@ All new features maintain the same **Markdown-only**, **configuration-driven**, 
 * **Extensible Architecture**
 
   * Modular utilities for configuration, date handling, batch processing, and API access.
-  * Comprehensive testing coverage with 29+ batch utility tests.
+  * Comprehensive testing coverage with 241+ unit tests across all modules.
+* **Report Navigation & Documentation**
+  
+  * Glossary system with clickable footnote links (†) for metric definitions.
+  * Context-aware glossary display (only shows definitions for enabled metrics).
+  * Team-focused improvements: Removed "Top Contributors" sections to avoid unwarranted comparisons.
 
 ---
 
@@ -62,10 +77,12 @@ All new features maintain the same **Markdown-only**, **configuration-driven**, 
 * ✅ **Work In Progress (WIP)** – Current active tickets per engineer and team total with configurable thresholds and over-limit warnings, controlled by `metrics.flow.wip` flag.
 * **Blocked Time** – Total time spent in Blocked or equivalent states (planned).
 
-### Delivery Metrics (GitHub)
+### Delivery Metrics (GitHub) ✅ **COMPLETED**
 
-* **PR Lead Time** – Duration from first commit → merge, with filtering for trivial PRs.
-* **Review Depth** – Reviewers per PR, number of comments, and review-to-author mapping (bot exclusion supported).
+* ✅ **PR Lead Time** – Duration from first commit → merge, with filtering for trivial PRs, controlled by `metrics.delivery.pr_lead_time` flag.
+* ✅ **Review Depth** – Reviewers per PR, review comments count, bot exclusion via regex patterns, controlled by `metrics.delivery.review_depth` flag.
+* ✅ **Individual PR Comments** – Comment count per PR displayed in contributor tables with bot filtering.
+* ✅ **Data Quality Assurance** – Proper filtering of merged vs closed PRs, commit date vs merge date handling.
 
 ### Data Quality & Guardrails
 
@@ -74,7 +91,7 @@ All new features maintain the same **Markdown-only**, **configuration-driven**, 
 
 ### Testing & Quality Assurance ✅ **COMPLETED** 
 
-* ✅ **Comprehensive test coverage** – 146+ unit tests across all utilities
+* ✅ **Comprehensive test coverage** – 241+ unit tests across all utilities
 * ✅ **Configuration testing** – Validation, merging, and environment override tests
 * ✅ **Mock-resistant design** – Core functionality tested with minimal external dependencies
 * ✅ **CI-ready foundation** – Test suite ready for continuous integration
@@ -144,15 +161,15 @@ Derived indicators to support performance coaching and 1:1 conversations:
 
 ---
 
-## 🧪 Phase 5 — Quality & Scalability (Future)
+## 🧪 Phase 5 — Quality & Scalability (🚧 Partially Complete)
 
 * **Testing Coverage** – Raise test coverage for new modules to ≥85%. (Optional)
 * **Fixtures & Stability** – Add deterministic fixtures for Jira/GitHub APIs and date ranges.
-* **Report Polish**
+* **Report Polish** ✅ **PARTIALLY COMPLETED**
 
-  * Normalize all Markdown table formats.
-  * Add a concise **Glossary** section with metric definitions.
-  * Use inline footnotes (†) linking metrics to glossary anchors.
+  * ✅ Normalize all Markdown table formats.
+  * ✅ Add a concise **Glossary** section with metric definitions.
+  * ✅ Use inline footnotes (†) linking metrics to glossary anchors.
 * **Change Tracking**
 
   * Maintain short, imperative changelog entries.
@@ -197,9 +214,11 @@ Each new capability will be developed as **incremental, self-contained commits**
 | ----------------------------------- | ------------------------------------- | ---------- | --------- |
 | **Batch Processing System**         | Multi-week report generation          | ✅ **Done** | ~~High~~  |
 | **Basic Flow Metrics (Cycle/WIP)**  | Jira performance indicators           | ✅ **Done** | ~~High~~  |
-| **Enhanced Delivery Metrics**       | GitHub PR metrics and review depth    | 🚧 Planned | 🔥 High   |
+| **Enhanced Delivery Metrics**       | GitHub PR metrics and review depth    | ✅ **Done** | ~~High~~  |
+| **Report Glossary & Navigation**    | Footnote links and metric definitions | ✅ **Done** | ~~High~~  |
 | **Unified Reports (Jira+GitHub)**   | Cross-platform correlation            | 📋 Planned | 🔥 High   |
 | **Coaching Signals**                | Growth-oriented insights              | 📋 Planned | 🔥 High   |
+| **Blocked Time Tracking**           | Jira blocked state analytics          | 📋 Planned | 🔥 High   |
 | **Trend Analysis & CSV Exports**    | Historical and external visualization | 📋 Planned | 🔧 Medium |
 | **Slack/Dashboard Integrations**    | Quality-of-life enhancements          | 📋 Planned | 💡 Future |
 | **Scheduling & Multi-Team Support** | Scalability improvements              | 📋 Planned | 💡 Future |
