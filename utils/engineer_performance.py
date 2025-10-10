@@ -58,14 +58,16 @@ def generate_weekly_date_ranges(year: int, quarter: int) -> List[Tuple[str, str]
     return weekly_ranges
 
 
-def collect_weekly_engineer_data(year: int, quarter: int, config_file: str) -> Dict[str, Dict[str, Any]]:
+def collect_weekly_engineer_data(year: int, quarter: int, jira_config_file: str, 
+                                github_config_file: str = None) -> Dict[str, Dict[str, Any]]:
     """
     Collect weekly engineer performance data for an entire quarter.
     
     Args:
         year: Year to analyze
         quarter: Quarter number (1-4)
-        config_file: Path to configuration file
+        jira_config_file: Path to Jira configuration file
+        github_config_file: Path to GitHub configuration file (optional)
         
     Returns:
         Dictionary mapping engineer names to their weekly performance data:
@@ -81,51 +83,251 @@ def collect_weekly_engineer_data(year: int, quarter: int, config_file: str) -> D
             }
         }
     """
-    weekly_ranges = generate_weekly_date_ranges(year, quarter)
-    engineer_data = defaultdict(lambda: {"weeks": {}, "display_name": "", "total_weeks": len(weekly_ranges)})
+    print(f"🔍 Collecting engineer data for Q{quarter} {year}...")
     
     # Load configuration
     from .config import get_config
-    config = get_config(config_file)
+    jira_config = get_config([jira_config_file])  # Fix: wrap in list
     
     # Initialize clients with proper configuration
-    github_client = GitHubApiClient(config)
-    jira_client = JiraApiClient(config_file)  # Pass config file path, not dict
+    # Use default GitHub config if not specified
+    if github_config_file is None:
+        github_config_file = 'config/github_config.yaml'
+    
+    try:
+        github_client = GitHubApiClient(github_config_file)
+        print(f"✅ Loaded GitHub config with {len(github_client.repositories)} repositories")
+    except Exception as e:
+        print(f"⚠️  Warning: Could not load GitHub config ({e}). GitHub metrics will be empty.")
+        github_client = None
+    
+    jira_client = JiraApiClient(jira_config_file)
     jira_client.initialize()
     
-    print(f"🔍 Collecting engineer data for Q{quarter} {year} ({len(weekly_ranges)} weeks)...")
+    # PERFORMANCE OPTIMIZATION: Use quarter-wide date ranges instead of weekly
+    from .date import get_quarter_range
+    start_date, end_date = get_quarter_range(year, quarter)
     
-    for i, (start_date, end_date) in enumerate(weekly_ranges, 1):
-        print(f"  📅 Processing week {i}/{len(weekly_ranges)}: {start_date} to {end_date}")
-        
-        # Collect GitHub data for this week
+    print(f"⚡ Performance mode: Collecting data for entire quarter ({start_date} to {end_date})")
+    
+    # Collect ALL data for the quarter at once
+    if github_client:
+        print("📊 Fetching GitHub data for entire quarter...")
         github_data = github_client.fetch_all_data(start_date, end_date)
-        
-        # Collect Jira data for this week
-        jira_tickets = jira_client.fetch_tickets(start_date, end_date)
-        
-        # Process GitHub data per engineer
-        github_engineers = _extract_github_engineer_metrics(github_data, config)
-        
-        # Process Jira data per engineer
-        jira_engineers = _extract_jira_engineer_metrics(jira_tickets, start_date, end_date, config, jira_client.jira_client)
-        
-        # Merge data for each engineer
-        all_engineers = set(github_engineers.keys()) | set(jira_engineers.keys())
-        
-        for engineer in all_engineers:
-            week_key = start_date
-            engineer_data[engineer]["weeks"][week_key] = {
-                "github": github_engineers.get(engineer, _empty_github_metrics()),
-                "jira": jira_engineers.get(engineer, _empty_jira_metrics())
-            }
-            
-            # Set display name from team members config
-            if not engineer_data[engineer]["display_name"]:
-                team_members = config.get('team_members', {})
-                engineer_data[engineer]["display_name"] = team_members.get(engineer, engineer)
+    else:
+        github_data = {'pull_requests': {}, 'commits': {}}
     
+    print("🎫 Fetching Jira data for entire quarter...")
+    jira_tickets = jira_client.fetch_tickets(start_date, end_date)
+    
+    # Now process the data into weekly buckets
+    weekly_ranges = generate_weekly_date_ranges(year, quarter)
+    engineer_data = defaultdict(lambda: {"weeks": {}, "display_name": "", "total_weeks": len(weekly_ranges)})
+    
+    print(f"🔄 Processing data into {len(weekly_ranges)} weekly buckets...")
+    
+    # Process GitHub data by week
+    github_weekly_data = _distribute_github_data_by_week(github_data, weekly_ranges, jira_config)
+    
+    # Process Jira data by week  
+    jira_weekly_data = _distribute_jira_data_by_week(jira_tickets, weekly_ranges, jira_config)
+    
+    # Merge weekly data
+    all_engineers = set(github_weekly_data.keys()) | set(jira_weekly_data.keys())
+    
+    for engineer in all_engineers:
+        engineer_github_weeks = github_weekly_data.get(engineer, {})
+        engineer_jira_weeks = jira_weekly_data.get(engineer, {})
+        
+        # Merge weekly data for this engineer
+        for week_start, _ in weekly_ranges:
+            engineer_data[engineer]["weeks"][week_start] = {
+                "github": engineer_github_weeks.get(week_start, _empty_github_metrics()),
+                "jira": engineer_jira_weeks.get(week_start, _empty_jira_metrics())
+            }
+        
+        # Set display name from team members config
+        if not engineer_data[engineer]["display_name"]:
+            team_members = jira_config.get('team_members', {})
+            engineer_data[engineer]["display_name"] = team_members.get(engineer, engineer)
+    
+    print(f"✅ Data processing complete! Found {len(engineer_data)} engineers")
     return dict(engineer_data)
+
+
+def _distribute_github_data_by_week(github_data: Dict[str, Any], 
+                                   weekly_ranges: List[Tuple[str, str]], 
+                                   config: Dict[str, Any]) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    """
+    Distribute GitHub data into weekly buckets by engineer.
+    
+    Returns:
+        {
+            "engineer_id": {
+                "2025-04-07": {"prs_merged": 2, "commits": 5, ...},
+                "2025-04-14": {"prs_merged": 1, "commits": 3, ...},
+                ...
+            }
+        }
+    """
+    from datetime import datetime
+    
+    engineer_weekly_data = defaultdict(lambda: defaultdict(lambda: _empty_github_metrics()))
+    
+    # Process PRs by merge date
+    for repo, prs in github_data.get('pull_requests', {}).items():
+        for pr in prs:
+            author = pr.get('user', {}).get('login', 'unknown')
+            if author == 'unknown':
+                continue
+                
+            # Find which week this PR belongs to based on merge date
+            merged_at = pr.get('merged_at')
+            if not merged_at:
+                continue
+                
+            merged_date = datetime.fromisoformat(merged_at.replace('Z', '+00:00'))
+            merged_date_str = merged_date.strftime('%Y-%m-%d')
+            
+            # Find the matching week
+            week_key = None
+            for week_start, week_end in weekly_ranges:
+                if week_start <= merged_date_str <= week_end:
+                    week_key = week_start
+                    break
+            
+            if week_key:
+                metrics = engineer_weekly_data[author][week_key]
+                metrics['prs_created'] += 1
+                if pr.get('merged_at'):
+                    metrics['prs_merged'] += 1
+                    metrics['lines_added'] += pr.get('additions', 0)
+                    metrics['lines_deleted'] += pr.get('deletions', 0)
+                    
+                    # Add review metrics if available
+                    if 'reviews' in pr:
+                        from .github import compute_pr_review_depth
+                        review_depth = compute_pr_review_depth(pr, config)
+                        metrics['reviews_received'] += review_depth.get('reviewers_count', 0)
+                        metrics['comments_received'] += review_depth.get('review_comments_count', 0)
+                
+                # Count reviews given by this engineer
+                for review in pr.get('reviews', []):
+                    reviewer = review.get('user', {}).get('login')
+                    if reviewer and reviewer != author and week_key:
+                        engineer_weekly_data[reviewer][week_key]['reviews_given'] += 1
+                
+                # Count comments given by this engineer
+                for comment in pr.get('review_comments', []):
+                    commenter = comment.get('user', {}).get('login')
+                    if commenter and commenter != author and week_key:
+                        engineer_weekly_data[commenter][week_key]['comments_given'] += 1
+    
+    # Process commits by commit date
+    for repo, commits in github_data.get('commits', {}).items():
+        for commit in commits:
+            author = commit.get('author', {}).get('login')
+            if not author:
+                continue
+                
+            # Find which week this commit belongs to
+            commit_date = commit.get('commit', {}).get('author', {}).get('date')
+            if not commit_date:
+                continue
+                
+            commit_datetime = datetime.fromisoformat(commit_date.replace('Z', '+00:00'))
+            commit_date_str = commit_datetime.strftime('%Y-%m-%d')
+            
+            # Find the matching week
+            week_key = None
+            for week_start, week_end in weekly_ranges:
+                if week_start <= commit_date_str <= week_end:
+                    week_key = week_start
+                    break
+            
+            if week_key:
+                engineer_weekly_data[author][week_key]['commits'] += 1
+    
+    # Convert defaultdicts to regular dicts
+    return {engineer: dict(weeks) for engineer, weeks in engineer_weekly_data.items()}
+
+
+def _distribute_jira_data_by_week(tickets: List[Any], 
+                                 weekly_ranges: List[Tuple[str, str]], 
+                                 config: Dict[str, Any]) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    """
+    Distribute Jira tickets into weekly buckets by engineer based on completion date.
+    
+    Returns:
+        {
+            "engineer_email": {
+                "2025-04-07": {"tickets_completed": 2, "current_wip": 1, ...},
+                "2025-04-14": {"tickets_completed": 1, "current_wip": 2, ...},
+                ...
+            }
+        }
+    """
+    from datetime import datetime
+    
+    engineer_weekly_data = defaultdict(lambda: defaultdict(lambda: _empty_jira_metrics()))
+    
+    # Get team member mapping
+    team_members = config.get('team_members', {})
+    completed_states = config.get('status_filters', {}).get('completed', ['Closed', 'Done'])
+    active_states = config.get('states', {}).get('active', ['In Progress', 'Review'])
+    
+    for ticket in tickets:
+        assignee_email = getattr(ticket.fields.assignee, 'emailAddress', None) if ticket.fields.assignee else None
+        if not assignee_email:
+            continue
+            
+        status = ticket.fields.status.name
+        
+        # For completed tickets, find the week they were completed
+        if status in completed_states:
+            # Use updated date as proxy for completion date
+            updated_str = ticket.fields.updated.split('T')[0]  # Get just the date part
+            
+            # Find the matching week
+            week_key = None
+            for week_start, week_end in weekly_ranges:
+                if week_start <= updated_str <= week_end:
+                    week_key = week_start
+                    break
+            
+            if week_key:
+                engineer_weekly_data[assignee_email][week_key]['tickets_completed'] += 1
+                
+                # Calculate cycle time if possible
+                try:
+                    from .jira import compute_cycle_time_days
+                    states_done = config.get('status_filters', {}).get('completed', ['Closed', 'Done'])
+                    state_in_progress = config.get('states', {}).get('in_progress', 'In Progress')
+                    
+                    cycle_time = compute_cycle_time_days(ticket, states_done, state_in_progress)
+                    if cycle_time is not None:
+                        engineer_weekly_data[assignee_email][week_key]['cycle_times'].append(cycle_time)
+                except Exception:
+                    pass  # Skip cycle time if not available
+        
+        # For active tickets, add to current WIP for latest week
+        elif status in active_states:
+            # Add to the last week of the quarter
+            if weekly_ranges:
+                last_week_key = weekly_ranges[-1][0]
+                engineer_weekly_data[assignee_email][last_week_key]['current_wip'] += 1
+    
+    # Calculate average cycle times for each engineer/week
+    for engineer, weeks in engineer_weekly_data.items():
+        for week_key, metrics in weeks.items():
+            if metrics['cycle_times']:
+                import statistics
+                metrics['avg_cycle_time'] = statistics.mean(metrics['cycle_times'])
+            else:
+                metrics['avg_cycle_time'] = 0.0
+    
+    # Convert defaultdicts to regular dicts
+    return {engineer: dict(weeks) for engineer, weeks in engineer_weekly_data.items()}
 
 
 def _extract_github_engineer_metrics(github_data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:

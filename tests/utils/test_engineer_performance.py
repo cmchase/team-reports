@@ -496,7 +496,7 @@ class TestEngineerPerformanceIntegration(unittest.TestCase):
         with patch('utils.engineer_performance.generate_weekly_date_ranges', 
                   return_value=[('2025-04-07', '2025-04-13')]):
             
-            engineer_data = collect_weekly_engineer_data(2025, 2, 'mock_config.yaml')
+            engineer_data = collect_weekly_engineer_data(2025, 2, 'mock_jira_config.yaml', 'mock_github_config.yaml')
             
             # Verify structure
             self.assertIn('john.doe', engineer_data)

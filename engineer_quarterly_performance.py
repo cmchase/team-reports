@@ -46,10 +46,12 @@ load_dotenv()
 class EngineerQuarterlyPerformance:
     """Main class for generating engineer quarterly performance reports."""
     
-    def __init__(self, config_file: str = 'config/jira_config.yaml'):
+    def __init__(self, jira_config_file: str = 'config/jira_config.yaml', 
+                 github_config_file: str = 'config/github_config.yaml'):
         """Initialize with configuration."""
-        self.config_file = config_file
-        self.config = get_config(config_file)
+        self.jira_config_file = jira_config_file
+        self.github_config_file = github_config_file
+        self.config = get_config([jira_config_file])  # Fix: wrap in list
         
     def generate_report(self, year: int, quarter: int) -> str:
         """Generate the complete engineer quarterly performance report."""
@@ -57,7 +59,7 @@ class EngineerQuarterlyPerformance:
         
         # Collect all engineer data for the quarter
         print("📊 Collecting engineer performance data...")
-        engineer_data = collect_weekly_engineer_data(year, quarter, self.config_file)
+        engineer_data = collect_weekly_engineer_data(year, quarter, self.jira_config_file, self.github_config_file)
         
         if not engineer_data:
             return self._generate_empty_report(year, quarter)
@@ -408,7 +410,7 @@ def main():
         report = performance_analyzer.generate_report(year, quarter)
         
         # Add active configuration if enabled
-        config = get_config(config_file)
+        config = get_config([config_file])  # Fix: wrap in list
         def flag(path: str) -> bool:
             keys = path.split('.')
             value = config
