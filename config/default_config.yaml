@@ -23,12 +23,24 @@ metrics:
   growth:
     enabled: false        # Growth and coaching signals
 
+# Reports feature flags
+reports:
+  engineer_performance:
+    enabled: false        # Engineer quarterly performance tracking
+
 # Configurable thresholds for analytics
 thresholds:
   wip:
     max_per_engineer: 3  # Default WIP limit per engineer
   delivery:
     min_lines_changed: 5  # Minimum lines changed to include PR in lead time analysis
+
+# Coaching thresholds for engineer performance analysis
+coaching:
+  min_prs_per_week: 1.0          # Minimum PRs per week to avoid productivity concerns
+  max_wip_threshold: 3           # Maximum WIP tickets before flagging workload issues
+  min_review_participation: 0.5  # Minimum ratio of reviews given vs received
+  productivity_concern_weeks: 3   # Number of consecutive low weeks before flagging
 
 # State mappings for different systems  
 states:
