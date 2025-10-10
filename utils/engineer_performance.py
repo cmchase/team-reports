@@ -58,14 +58,14 @@ def generate_weekly_date_ranges(year: int, quarter: int) -> List[Tuple[str, str]
     return weekly_ranges
 
 
-def collect_weekly_engineer_data(year: int, quarter: int, config: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+def collect_weekly_engineer_data(year: int, quarter: int, config_file: str) -> Dict[str, Dict[str, Any]]:
     """
     Collect weekly engineer performance data for an entire quarter.
     
     Args:
         year: Year to analyze
         quarter: Quarter number (1-4)
-        config: Configuration dictionary with API settings
+        config_file: Path to configuration file
         
     Returns:
         Dictionary mapping engineer names to their weekly performance data:
@@ -84,9 +84,13 @@ def collect_weekly_engineer_data(year: int, quarter: int, config: Dict[str, Any]
     weekly_ranges = generate_weekly_date_ranges(year, quarter)
     engineer_data = defaultdict(lambda: {"weeks": {}, "display_name": "", "total_weeks": len(weekly_ranges)})
     
-    # Initialize clients
+    # Load configuration
+    from .config import get_config
+    config = get_config(config_file)
+    
+    # Initialize clients with proper configuration
     github_client = GitHubApiClient(config)
-    jira_client = JiraApiClient(config)
+    jira_client = JiraApiClient(config_file)  # Pass config file path, not dict
     jira_client.initialize()
     
     print(f"🔍 Collecting engineer data for Q{quarter} {year} ({len(weekly_ranges)} weeks)...")
@@ -104,7 +108,7 @@ def collect_weekly_engineer_data(year: int, quarter: int, config: Dict[str, Any]
         github_engineers = _extract_github_engineer_metrics(github_data, config)
         
         # Process Jira data per engineer
-        jira_engineers = _extract_jira_engineer_metrics(jira_tickets, start_date, end_date, config, jira_client)
+        jira_engineers = _extract_jira_engineer_metrics(jira_tickets, start_date, end_date, config, jira_client.jira_client)
         
         # Merge data for each engineer
         all_engineers = set(github_engineers.keys()) | set(jira_engineers.keys())

@@ -445,7 +445,8 @@ class TestEngineerPerformanceIntegration(unittest.TestCase):
     
     @patch('utils.engineer_performance.GitHubApiClient')
     @patch('utils.engineer_performance.JiraApiClient')
-    def test_collect_weekly_engineer_data_integration(self, mock_jira_client_class, mock_github_client_class):
+    @patch('utils.engineer_performance.get_config')
+    def test_collect_weekly_engineer_data_integration(self, mock_get_config, mock_jira_client_class, mock_github_client_class):
         """Test end-to-end weekly data collection."""
         # Mock GitHub client
         mock_github_client = Mock()
@@ -488,11 +489,14 @@ class TestEngineerPerformanceIntegration(unittest.TestCase):
             }
         }
         
+        # Mock get_config to return our test config
+        mock_get_config.return_value = config
+        
         # This would be a long-running test in reality, so we'll mock the weekly ranges
         with patch('utils.engineer_performance.generate_weekly_date_ranges', 
                   return_value=[('2025-04-07', '2025-04-13')]):
             
-            engineer_data = collect_weekly_engineer_data(2025, 2, config)
+            engineer_data = collect_weekly_engineer_data(2025, 2, 'mock_config.yaml')
             
             # Verify structure
             self.assertIn('john.doe', engineer_data)

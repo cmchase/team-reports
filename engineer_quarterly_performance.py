@@ -48,6 +48,7 @@ class EngineerQuarterlyPerformance:
     
     def __init__(self, config_file: str = 'config/jira_config.yaml'):
         """Initialize with configuration."""
+        self.config_file = config_file
         self.config = get_config(config_file)
         
     def generate_report(self, year: int, quarter: int) -> str:
@@ -56,7 +57,7 @@ class EngineerQuarterlyPerformance:
         
         # Collect all engineer data for the quarter
         print("📊 Collecting engineer performance data...")
-        engineer_data = collect_weekly_engineer_data(year, quarter, self.config)
+        engineer_data = collect_weekly_engineer_data(year, quarter, self.config_file)
         
         if not engineer_data:
             return self._generate_empty_report(year, quarter)
