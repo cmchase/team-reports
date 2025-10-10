@@ -501,6 +501,113 @@ def load_default_config() -> Dict[str, Any]:
         raise yaml.YAMLError(f"Error parsing default config: {e}")
 
 
+def load_team_config(team_config_file: str = 'config/team_config.yaml') -> Dict[str, Any]:
+    """
+    Load team configuration from team_config.yaml.
+    
+    Args:
+        team_config_file: Path to team configuration file
+        
+    Returns:
+        Dict containing team configuration
+        
+    Example:
+        team_config = load_team_config()
+        team_members = team_config['team_members']
+    """
+    try:
+        with open(team_config_file, 'r') as f:
+            config = yaml.safe_load(f) or {}
+        print(f"✅ Loaded team configuration from {team_config_file}")
+        return config
+        
+    except FileNotFoundError:
+        print(f"⚠️  Team config file not found: {team_config_file}")
+        return {}
+        
+    except yaml.YAMLError as e:
+        print(f"❌ Error parsing team config {team_config_file}: {e}")
+        return {}
+
+
+def generate_jira_team_members(team_config: Dict[str, Any]) -> Dict[str, str]:
+    """
+    Generate Jira team_members mapping from consolidated team config.
+    
+    Args:
+        team_config: Team configuration from team_config.yaml
+        
+    Returns:
+        Dict mapping jira_email -> display_name
+        
+    Example:
+        {"brasmith@redhat.com": "Brad Smith"}
+    """
+    team_members = team_config.get('team_members', {})
+    jira_mapping = {}
+    
+    for person_id, person_data in team_members.items():
+        jira_email = person_data.get('jira_email')
+        display_name = person_data.get('display_name')
+        
+        if jira_email and display_name:
+            jira_mapping[jira_email] = display_name
+            
+    return jira_mapping
+
+
+def generate_github_team_members(team_config: Dict[str, Any]) -> Dict[str, str]:
+    """
+    Generate GitHub team_members mapping from consolidated team config.
+    
+    Args:
+        team_config: Team configuration from team_config.yaml
+        
+    Returns:
+        Dict mapping github_username -> display_name
+        
+    Example:
+        {"infinitewarp": "Brad Smith"}
+    """
+    team_members = team_config.get('team_members', {})
+    github_mapping = {}
+    
+    for person_id, person_data in team_members.items():
+        github_username = person_data.get('github_username')
+        display_name = person_data.get('display_name')
+        
+        if github_username and display_name:
+            github_mapping[github_username] = display_name
+            
+    return github_mapping
+
+
+def generate_user_mapping(team_config: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
+    """
+    Generate user_mapping for cross-system identity resolution.
+    
+    Args:
+        team_config: Team configuration from team_config.yaml
+        
+    Returns:
+        Dict with github_to_jira mapping
+        
+    Example:
+        {"github_to_jira": {"infinitewarp": "brasmith@redhat.com"}}
+    """
+    team_members = team_config.get('team_members', {})
+    github_to_jira = {}
+    
+    for person_id, person_data in team_members.items():
+        github_username = person_data.get('github_username')
+        jira_email = person_data.get('jira_email')
+        
+        if github_username and jira_email:
+            github_to_jira[github_username] = jira_email
+            
+    return {"github_to_jira": github_to_jira}
+
+
 def load_user_configs(paths: Optional[List[str]] = None) -> Dict[str, Any]:
     """
     Load user configuration files (config/jira_config.yaml, config/github_config.yaml).
@@ -642,8 +749,9 @@ def get_config(paths: Optional[List[str]] = None) -> Dict[str, Any]:
     
     Precedence (later overrides earlier):
     1. Default config (config/default_config.yaml)
-    2. User YAML files (config/jira_config.yaml, config/github_config.yaml) 
-    3. Environment variable overrides
+    2. Team config (config/team_config.yaml) - injected as team_members, user_mapping, etc.
+    3. User YAML files (config/jira_config.yaml, config/github_config.yaml) 
+    4. Environment variable overrides
     
     Args:
         paths: Optional list of user config paths. If None, auto-detect
@@ -666,7 +774,38 @@ def get_config(paths: Optional[List[str]] = None) -> Dict[str, Any]:
         print(f"❌ Failed to load default config: {e}")
         config = {}
     
-    # Step 2: Merge user configs
+    # Step 2: Load team configuration and merge it in
+    try:
+        team_config = load_team_config()
+        if team_config:
+            # Inject team-derived configurations
+            if 'team_members' not in config:
+                config['team_members'] = {}
+            if 'user_mapping' not in config:
+                config['user_mapping'] = {}
+            if 'team_categories' not in config:
+                config['team_categories'] = {}
+            if 'team_sizing' not in config:
+                config['team_sizing'] = {}
+                
+            # Merge team configurations
+            config['team_categories'].update(team_config.get('team_categories', {}))
+            config['team_sizing'].update(team_config.get('team_sizing', {}))
+            
+            # Generate mappings from consolidated team data
+            jira_team_members = generate_jira_team_members(team_config)
+            github_team_members = generate_github_team_members(team_config)
+            user_mapping = generate_user_mapping(team_config)
+            
+            # Merge generated mappings (prioritizing team_config)
+            config['team_members'].update(jira_team_members)
+            config['user_mapping'].update(user_mapping)
+            
+            print("✅ Merged team configuration")
+    except Exception as e:
+        print(f"⚠️  Could not load team config: {e}")
+    
+    # Step 3: Merge user configs
     try:
         user_config = load_user_configs(paths)
         config = deep_merge(config, user_config)

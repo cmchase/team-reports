@@ -95,4 +95,5 @@ config/config.local
 # Promotion analysis reports (contains sensitive employee data)
 promotion_analysis_*.md
 *_promotion_readiness_report.md
-*_summary_*.md 
+*_summary_*.md config/team_config.yaml
+Reports/

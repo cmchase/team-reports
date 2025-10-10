@@ -12,23 +12,76 @@ The tool has been refactored to use external configuration files, making it easy
 
 ## 🚀 Quick Setup
 
-### 1. Copy Configuration Template
+### 1. Copy Configuration Templates
 ```bash
+# Copy team configuration template (single source of truth for team data)
+cp config/team_config_example.yaml config/team_config.yaml
+
+# Copy system-specific templates
 cp config/jira_config_example.yaml config/my_jira_config.yaml
+cp config/github_config_example.yaml config/my_github_config.yaml
 ```
 
-### 2. Edit Your Configuration
+### 2. Configure Your Team
 ```bash
-# Edit the config file for your team
-nano config/my_jira_config.yaml
+# Configure team members first (this replaces scattered team mappings)
+nano config/team_config.yaml
 ```
 
-### 3. Run with Your Config
+### 3. Configure System-Specific Settings
+```bash
+# Edit Jira configuration for your projects
+nano config/my_jira_config.yaml
+
+# Edit GitHub configuration for your repositories  
+nano config/my_github_config.yaml
+```
+
+### 4. Run with Your Config
 ```bash
 python3 jira_weekly_summary.py 2025-07-15 2025-07-22 config/my_jira_config.yaml
 ```
 
 ## ⚙️ Configuration File Structure
+
+### Team Configuration (team_config.yaml)
+
+**NEW**: All team member data is now consolidated in a single `team_config.yaml` file. This eliminates duplicate mappings and provides a single source of truth for team identity data.
+
+```yaml
+# Team members - comprehensive identity mapping
+# Each entry contains all identifiers for a person across systems
+team_members:
+  brad_smith:
+    display_name: "Brad Smith"
+    jira_email: "brad.smith@company.com"
+    github_username: "bradsmith"
+    
+  alice_manager:
+    display_name: "Alice Manager"
+    jira_email: "alice.manager@company.com"
+    github_username: "alicemanager"
+
+# Team categorization rules
+team_categories:
+  Backend Development:
+    components: ["Backend", "API"]
+    keywords: ["database", "service"]
+    description: "Backend services and API development"
+
+# Team sizing for estimation  
+team_sizing:
+  "xsmall": 1
+  "small": 3
+  "medium": 9
+```
+
+**Benefits of team_config.yaml:**
+- ✅ **Single source of truth**: All team data in one place
+- ✅ **No duplication**: Same person defined once with all identities
+- ✅ **Cross-system mapping**: Automatically links GitHub ↔ Jira identities
+- ✅ **Easy maintenance**: Add new team members in one location
+- ✅ **Engineer performance**: Unifies data across GitHub and Jira systems
 
 ### Base JQL Filter
 This is the core filter that defines which tickets belong to your team:

@@ -11,12 +11,10 @@ repositories:
   - "repo3"
   # Add more repositories as needed
 
-# Team member mapping (GitHub username -> Display name)
-team_members:
-  "github_username1": "John Doe"
-  "github_username2": "Jane Smith"
-  "octocat": "GitHub Mascot"
-  # Add more team members as needed
+# Team member mapping is now managed in team_config.yaml
+# This provides a single source of truth for all team identity mappings
+# Copy team_config_example.yaml to team_config.yaml and customize it for your team
+# The system will automatically generate the required mappings from the consolidated team data
 
 # Report settings
 report_settings:

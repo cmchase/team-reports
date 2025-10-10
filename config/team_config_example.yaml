@@ -1,0 +1,87 @@
+# Team Configuration Example
+# Copy this file to team_config.yaml and customize for your team
+
+# Team members - comprehensive identity mapping
+# Each entry contains all identifiers for a person across systems
+team_members:
+  chad_smith:
+    display_name: "Chad Smith"
+    jira_email: "chad.smith@company.com"
+    github_username: "chadsmith"
+    
+  alice_manager:
+    display_name: "Alice Manager"
+    jira_email: "alice.manager@company.com"
+    github_username: "alicemanager"
+    
+  bob_developer:
+    display_name: "Bob Developer" 
+    jira_email: "bob.dev@company.com"
+    github_username: "bobdev"
+    
+  carol_engineer:
+    display_name: "Carol Engineer"
+    jira_email: "carol.engineer@company.com"
+    github_username: "caroleng"
+    
+  dave_tester:
+    display_name: "Dave Tester"
+    jira_email: "dave.tester@company.com"
+    github_username: "davetester"
+
+# Add new team members here following the same pattern:
+#  john_doe:
+#    display_name: "John Doe"
+#    jira_email: "john.doe@company.com"
+#    github_username: "johndoe"
+
+# Team categorization rules for Jira reports
+# Each category can have components, projects, keywords, and description
+team_categories:
+  Backend Development:
+    components:
+      - "Backend"
+      - "API"
+    keywords:
+      - "database"
+      - "service"
+    description: "Backend services and API development"
+
+  Frontend Development:
+    components:
+      - "Frontend"
+      - "UI"
+    keywords:
+      - "react"
+      - "typescript"
+    description: "Frontend and user interface work"
+
+  Quality Engineering:
+    components:
+      - "QE"
+      - "Testing"
+    projects:
+      - "TESTS"
+    description: "Quality engineering and testing"
+
+  DevOps:
+    keywords:
+      - "deployment"
+      - "infrastructure"
+      - "kubernetes"
+    description: "DevOps and infrastructure work"
+
+  Security:
+    keywords:
+      - "security"
+      - "vulnerability"
+      - "audit"
+    description: "Security-related work and vulnerability fixes"
+
+# Team sizing for estimation
+team_sizing:
+  "xsmall": 1
+  "small": 3
+  "medium": 9
+  "large": 27
+  "xlarge": 81
