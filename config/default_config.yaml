@@ -61,6 +61,14 @@ report:
 team_categories: {}
 team_members: {}
 
+# Cross-system user mapping for engineer performance reports
+# Maps GitHub usernames to Jira email addresses to unify data
+user_mapping:
+  github_to_jira: {}  # {"github_username": "jira_email@company.com"}
+  # Example:
+  # github_to_jira:
+  #   "johndoe": "john.doe@company.com"
+
 # Status filters for different report types  
 status_filters:
   planned: ["New", "Refinement", "To Do"]

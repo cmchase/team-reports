@@ -58,6 +58,31 @@ def generate_weekly_date_ranges(year: int, quarter: int) -> List[Tuple[str, str]
     return weekly_ranges
 
 
+def _normalize_user_id(user_id: str, source_system: str, config: Dict[str, Any]) -> str:
+    """
+    Normalize user identifiers across GitHub and Jira systems.
+    
+    Args:
+        user_id: The user identifier (GitHub username or Jira email)
+        source_system: "github" or "jira"
+        config: Configuration containing user_mapping
+        
+    Returns:
+        Normalized identifier (Jira email as canonical form)
+    """
+    user_mapping = config.get('user_mapping', {})
+    github_to_jira = user_mapping.get('github_to_jira', {})
+    
+    if source_system == "github":
+        # Map GitHub username to Jira email if mapping exists
+        return github_to_jira.get(user_id, user_id)
+    elif source_system == "jira":
+        # Jira email is already our canonical form
+        return user_id
+    else:
+        return user_id
+
+
 def collect_weekly_engineer_data(year: int, quarter: int, jira_config_file: str, 
                                 github_config_file: str = None) -> Dict[str, Dict[str, Any]]:
     """
@@ -181,6 +206,9 @@ def _distribute_github_data_by_week(github_data: Dict[str, Any],
             if author == 'unknown':
                 continue
                 
+            # Normalize GitHub username to canonical form (Jira email)
+            normalized_author = _normalize_user_id(author, "github", config)
+                
             # Find which week this PR belongs to based on merge date
             merged_at = pr.get('merged_at')
             if not merged_at:
@@ -197,7 +225,7 @@ def _distribute_github_data_by_week(github_data: Dict[str, Any],
                     break
             
             if week_key:
-                metrics = engineer_weekly_data[author][week_key]
+                metrics = engineer_weekly_data[normalized_author][week_key]
                 metrics['prs_created'] += 1
                 if pr.get('merged_at'):
                     metrics['prs_merged'] += 1
@@ -215,13 +243,15 @@ def _distribute_github_data_by_week(github_data: Dict[str, Any],
                 for review in pr.get('reviews', []):
                     reviewer = review.get('user', {}).get('login')
                     if reviewer and reviewer != author and week_key:
-                        engineer_weekly_data[reviewer][week_key]['reviews_given'] += 1
+                        normalized_reviewer = _normalize_user_id(reviewer, "github", config)
+                        engineer_weekly_data[normalized_reviewer][week_key]['reviews_given'] += 1
                 
                 # Count comments given by this engineer
                 for comment in pr.get('review_comments', []):
                     commenter = comment.get('user', {}).get('login')
                     if commenter and commenter != author and week_key:
-                        engineer_weekly_data[commenter][week_key]['comments_given'] += 1
+                        normalized_commenter = _normalize_user_id(commenter, "github", config)
+                        engineer_weekly_data[normalized_commenter][week_key]['comments_given'] += 1
     
     # Process commits by commit date
     for repo, commits in github_data.get('commits', {}).items():
@@ -229,6 +259,9 @@ def _distribute_github_data_by_week(github_data: Dict[str, Any],
             author = commit.get('author', {}).get('login')
             if not author:
                 continue
+                
+            # Normalize GitHub username to canonical form (Jira email)
+            normalized_author = _normalize_user_id(author, "github", config)
                 
             # Find which week this commit belongs to
             commit_date = commit.get('commit', {}).get('author', {}).get('date')
@@ -246,7 +279,7 @@ def _distribute_github_data_by_week(github_data: Dict[str, Any],
                     break
             
             if week_key:
-                engineer_weekly_data[author][week_key]['commits'] += 1
+                engineer_weekly_data[normalized_author][week_key]['commits'] += 1
     
     # Convert defaultdicts to regular dicts
     return {engineer: dict(weeks) for engineer, weeks in engineer_weekly_data.items()}
@@ -281,6 +314,9 @@ def _distribute_jira_data_by_week(tickets: List[Any],
         if not assignee_email:
             continue
             
+        # Normalize Jira email (already canonical form, but for consistency)
+        normalized_assignee = _normalize_user_id(assignee_email, "jira", config)
+            
         status = ticket.fields.status.name
         
         # For completed tickets, find the week they were completed
@@ -296,7 +332,7 @@ def _distribute_jira_data_by_week(tickets: List[Any],
                     break
             
             if week_key:
-                engineer_weekly_data[assignee_email][week_key]['tickets_completed'] += 1
+                engineer_weekly_data[normalized_assignee][week_key]['tickets_completed'] += 1
                 
                 # Calculate cycle time if possible
                 try:
@@ -306,7 +342,7 @@ def _distribute_jira_data_by_week(tickets: List[Any],
                     
                     cycle_time = compute_cycle_time_days(ticket, states_done, state_in_progress)
                     if cycle_time is not None:
-                        engineer_weekly_data[assignee_email][week_key]['cycle_times'].append(cycle_time)
+                        engineer_weekly_data[normalized_assignee][week_key]['cycle_times'].append(cycle_time)
                 except Exception:
                     pass  # Skip cycle time if not available
         
@@ -315,7 +351,7 @@ def _distribute_jira_data_by_week(tickets: List[Any],
             # Add to the last week of the quarter
             if weekly_ranges:
                 last_week_key = weekly_ranges[-1][0]
-                engineer_weekly_data[assignee_email][last_week_key]['current_wip'] += 1
+                engineer_weekly_data[normalized_assignee][last_week_key]['current_wip'] += 1
     
     # Calculate average cycle times for each engineer/week
     for engineer, weeks in engineer_weekly_data.items():
@@ -341,7 +377,10 @@ def _extract_github_engineer_metrics(github_data: Dict[str, Any], config: Dict[s
             if author == 'unknown':
                 continue
                 
-            metrics = engineer_metrics[author]
+            # Normalize GitHub username to canonical form (Jira email)
+            normalized_author = _normalize_user_id(author, "github", config)
+            
+            metrics = engineer_metrics[normalized_author]
             metrics['prs_created'] += 1
             
             if pr.get('merged_at'):
@@ -360,20 +399,23 @@ def _extract_github_engineer_metrics(github_data: Dict[str, Any], config: Dict[s
             for review in pr.get('reviews', []):
                 reviewer = review.get('user', {}).get('login')
                 if reviewer and reviewer != author:
-                    engineer_metrics[reviewer]['reviews_given'] += 1
+                    normalized_reviewer = _normalize_user_id(reviewer, "github", config)
+                    engineer_metrics[normalized_reviewer]['reviews_given'] += 1
             
             # Count comments given by this engineer
             for comment in pr.get('review_comments', []):
                 commenter = comment.get('user', {}).get('login')
                 if commenter and commenter != author:
-                    engineer_metrics[commenter]['comments_given'] += 1
+                    normalized_commenter = _normalize_user_id(commenter, "github", config)
+                    engineer_metrics[normalized_commenter]['comments_given'] += 1
     
     # Process commits
     for repo, commits in github_data.get('commits', {}).items():
         for commit in commits:
             author = commit.get('author', {}).get('login')
             if author:
-                engineer_metrics[author]['commits'] += 1
+                normalized_author = _normalize_user_id(author, "github", config)
+                engineer_metrics[normalized_author]['commits'] += 1
     
     return dict(engineer_metrics)
 
@@ -390,10 +432,13 @@ def _extract_jira_engineer_metrics(tickets: List[Any], start_date: str, end_date
         assignee_email = getattr(ticket.fields.assignee, 'emailAddress', None) if ticket.fields.assignee else None
         assignee_name = team_members.get(assignee_email, assignee_email) if assignee_email else 'Unassigned'
         
-        if assignee_name == 'Unassigned' or not assignee_email:
+        # Normalize Jira email (already canonical form, but for consistency)
+        normalized_assignee = _normalize_user_id(assignee_email, "jira", config) if assignee_email else None
+        
+        if assignee_name == 'Unassigned' or not normalized_assignee:
             continue
             
-        metrics = engineer_metrics[assignee_email]
+        metrics = engineer_metrics[normalized_assignee]
         
         # Check if ticket was completed in this week
         status = ticket.fields.status.name
