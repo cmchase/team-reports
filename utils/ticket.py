@@ -7,6 +7,80 @@ including categorization logic that can be used across different scripts.
 """
 
 from typing import Dict, Any, List, Optional
+from datetime import datetime
+
+
+def get_completion_date(ticket) -> Optional[str]:
+    """
+    Get the completion date of a ticket, preferring resolutiondate over updated.
+    
+    Args:
+        ticket: JIRA issue object with fields
+        
+    Returns:
+        str: Completion date in YYYY-MM-DD format, or None if neither date is available
+        
+    Uses resolutiondate if available (more accurate for when ticket was actually completed),
+    falls back to updated date if resolutiondate is not set.
+    """
+    try:
+        # First try to use resolutiondate (most accurate for completion)
+        if hasattr(ticket.fields, 'resolutiondate') and ticket.fields.resolutiondate:
+            resolution_date = ticket.fields.resolutiondate
+            # Handle both string and datetime objects
+            if isinstance(resolution_date, str):
+                return resolution_date.split('T')[0]  # Extract date part
+            else:
+                return resolution_date.strftime('%Y-%m-%d')
+                
+        # Fall back to updated date if resolutiondate is not available
+        if hasattr(ticket.fields, 'updated') and ticket.fields.updated:
+            updated_date = ticket.fields.updated
+            # Handle both string and datetime objects
+            if isinstance(updated_date, str):
+                return updated_date.split('T')[0]  # Extract date part
+            else:
+                return updated_date.strftime('%Y-%m-%d')
+                
+    except (AttributeError, ValueError, TypeError):
+        pass
+        
+    return None
+
+
+def get_completion_datetime(ticket) -> Optional[datetime]:
+    """
+    Get the completion datetime of a ticket, preferring resolutiondate over updated.
+    
+    Args:
+        ticket: JIRA issue object with fields
+        
+    Returns:
+        datetime: Completion datetime object, or None if neither date is available
+        
+    Uses resolutiondate if available, falls back to updated date.
+    """
+    try:
+        # First try to use resolutiondate
+        if hasattr(ticket.fields, 'resolutiondate') and ticket.fields.resolutiondate:
+            resolution_date = ticket.fields.resolutiondate
+            if isinstance(resolution_date, str):
+                return datetime.fromisoformat(resolution_date.replace('Z', '+00:00'))
+            else:
+                return resolution_date
+                
+        # Fall back to updated date
+        if hasattr(ticket.fields, 'updated') and ticket.fields.updated:
+            updated_date = ticket.fields.updated
+            if isinstance(updated_date, str):
+                return datetime.fromisoformat(updated_date.replace('Z', '+00:00'))
+            else:
+                return updated_date
+                
+    except (AttributeError, ValueError, TypeError):
+        pass
+        
+    return None
 
 
 def categorize_ticket(issue, team_categories: Dict[str, Dict[str, Any]]) -> str:
@@ -85,7 +159,7 @@ def format_ticket_info(issue, jira_server_url: str, config: Optional[Dict[str, A
         - priority: Priority name or 'None'
         - story_points: Story points value (0 if not set)
         - components: List of component names
-        - updated: Last updated date (YYYY-MM-DD format)
+        - updated: Completion date (resolutiondate preferred, fallback to updated date) in YYYY-MM-DD format
         - url: Direct link to the ticket
     """
     # Get assignee email first
@@ -111,7 +185,7 @@ def format_ticket_info(issue, jira_server_url: str, config: Optional[Dict[str, A
         'priority': issue.fields.priority.name if issue.fields.priority else 'None',
         'story_points': int(getattr(issue.fields, 'customfield_12310243', None) or getattr(issue.fields, 'storypoints', None) or 0),
         'components': [comp.name for comp in getattr(issue.fields, 'components', [])],
-        'updated': str(issue.fields.updated)[:10],  # Just the date part
+        'updated': get_completion_date(issue) or str(issue.fields.updated)[:10],  # Use completion date (resolutiondate preferred)
         'url': f"{jira_server_url}/browse/{issue.key}"
     }
 

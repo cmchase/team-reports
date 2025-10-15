@@ -79,7 +79,7 @@ def build_jql_with_dates(base_jql: str, start_date: str, end_date: str,
             "completed"
         )
     """
-    date_filter = f'updated >= "{start_date}" AND updated <= "{end_date}"'
+    date_filter = f'resolutiondate >= "{start_date}" AND resolutiondate <= "{end_date}"'
     
     # Build filter components
     filters = [f'({base_jql})', f'({date_filter})']
@@ -93,7 +93,7 @@ def build_jql_with_dates(base_jql: str, start_date: str, end_date: str,
             filters.append(f'({status_filter})')
     
     # Get order by from config or use default
-    order_by = 'component ASC, updated DESC'  # Default ordering
+    order_by = 'component ASC, resolutiondate DESC'  # Default ordering with resolutiondate
     if config and 'report_settings' in config:
         order_by = config['report_settings'].get('order_by', order_by)
     

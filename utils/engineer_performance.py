@@ -321,13 +321,17 @@ def _distribute_jira_data_by_week(tickets: List[Any],
         
         # For completed tickets, find the week they were completed
         if status in completed_states:
-            # Use updated date as proxy for completion date
-            updated_str = ticket.fields.updated.split('T')[0]  # Get just the date part
+            # Use completion date (resolutiondate preferred, fallback to updated)
+            from .ticket import get_completion_date
+            completion_date_str = get_completion_date(ticket)
+            
+            if not completion_date_str:
+                continue  # Skip if no completion date available
             
             # Find the matching week
             week_key = None
             for week_start, week_end in weekly_ranges:
-                if week_start <= updated_str <= week_end:
+                if week_start <= completion_date_str <= week_end:
                     week_key = week_start
                     break
             
