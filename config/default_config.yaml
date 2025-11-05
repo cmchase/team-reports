@@ -48,7 +48,13 @@ states:
 
 # Bot accounts to filter out from reports
 bots:
-  patterns: []  # List of regex patterns to match bot usernames
+  patterns:
+    - ".*bot.*"      # Any username containing "bot"
+    - "konflux-.*"   # Konflux automation accounts
+    - "sourcery-ai.*" # Sourcery AI bot
+    - "dependabot"   # Dependabot automation
+    - "renovate"     # Renovate bot
+    - "github-actions" # GitHub Actions bot
 
 # Report generation settings
 report:

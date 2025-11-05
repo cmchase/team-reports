@@ -10,8 +10,10 @@ Key features:
 - Trend analysis and performance trajectory calculation
 - Coaching insights generation based on configurable thresholds
 - Cross-engineer collaboration analysis
+- Bot exclusion and cross-system identity consolidation
 """
 
+import re
 import statistics
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Tuple
@@ -58,24 +60,60 @@ def generate_weekly_date_ranges(year: int, quarter: int) -> List[Tuple[str, str]
     return weekly_ranges
 
 
-def _normalize_user_id(user_id: str, source_system: str, config: Dict[str, Any]) -> str:
+def _is_bot_user(user_id: str, config: Dict[str, Any]) -> bool:
     """
-    Normalize user identifiers across GitHub and Jira systems.
+    Enhanced bot detection for both GitHub and Jira users.
+    
+    Args:
+        user_id: The user identifier to check
+        config: Configuration containing bot patterns
+        
+    Returns:
+        True if the user is identified as a bot, False otherwise
+    """
+    if not user_id:
+        return False
+        
+    patterns = config.get('bots', {}).get('patterns', [])
+    for pattern in patterns:
+        try:
+            if re.search(pattern, user_id, re.IGNORECASE):
+                return True
+        except re.error:
+            # Skip invalid regex patterns
+            continue
+    return False
+
+
+def _normalize_user_id(user_id: str, source_system: str, config: Dict[str, Any]) -> Optional[str]:
+    """
+    Normalize user identifiers across GitHub and Jira systems with bot filtering.
     
     Args:
         user_id: The user identifier (GitHub username or Jira email)
         source_system: "github" or "jira"
-        config: Configuration containing user_mapping
+        config: Configuration containing user_mapping and bot patterns
         
     Returns:
-        Normalized identifier (Jira email as canonical form)
+        Normalized identifier (Jira email as canonical form) or None if user is a bot
     """
+    if not user_id:
+        return None
+        
+    # Filter out bots before any processing
+    if _is_bot_user(user_id, config):
+        return None
+    
     user_mapping = config.get('user_mapping', {})
     github_to_jira = user_mapping.get('github_to_jira', {})
     
     if source_system == "github":
         # Map GitHub username to Jira email if mapping exists
-        return github_to_jira.get(user_id, user_id)
+        mapped_id = github_to_jira.get(user_id, user_id)
+        # Double-check the mapped ID isn't a bot either
+        if _is_bot_user(mapped_id, config):
+            return None
+        return mapped_id
     elif source_system == "jira":
         # Jira email is already our canonical form
         return user_id
@@ -207,7 +245,10 @@ def _distribute_github_data_by_week(github_data: Dict[str, Any],
                 continue
                 
             # Normalize GitHub username to canonical form (Jira email)
+            # Skip if user is a bot (returns None)
             normalized_author = _normalize_user_id(author, "github", config)
+            if not normalized_author:
+                continue
                 
             # Find which week this PR belongs to based on merge date
             merged_at = pr.get('merged_at')
@@ -244,14 +285,16 @@ def _distribute_github_data_by_week(github_data: Dict[str, Any],
                     reviewer = review.get('user', {}).get('login')
                     if reviewer and reviewer != author and week_key:
                         normalized_reviewer = _normalize_user_id(reviewer, "github", config)
-                        engineer_weekly_data[normalized_reviewer][week_key]['reviews_given'] += 1
+                        if normalized_reviewer:  # Skip bots
+                            engineer_weekly_data[normalized_reviewer][week_key]['reviews_given'] += 1
                 
                 # Count comments given by this engineer
                 for comment in pr.get('review_comments', []):
                     commenter = comment.get('user', {}).get('login')
                     if commenter and commenter != author and week_key:
                         normalized_commenter = _normalize_user_id(commenter, "github", config)
-                        engineer_weekly_data[normalized_commenter][week_key]['comments_given'] += 1
+                        if normalized_commenter:  # Skip bots
+                            engineer_weekly_data[normalized_commenter][week_key]['comments_given'] += 1
     
     # Process commits by commit date
     for repo, commits in github_data.get('commits', {}).items():
@@ -261,7 +304,10 @@ def _distribute_github_data_by_week(github_data: Dict[str, Any],
                 continue
                 
             # Normalize GitHub username to canonical form (Jira email)
+            # Skip if user is a bot (returns None)
             normalized_author = _normalize_user_id(author, "github", config)
+            if not normalized_author:
+                continue
                 
             # Find which week this commit belongs to
             commit_date = commit.get('commit', {}).get('author', {}).get('date')
@@ -315,7 +361,10 @@ def _distribute_jira_data_by_week(tickets: List[Any],
             continue
             
         # Normalize Jira email (already canonical form, but for consistency)
+        # Skip if user is a bot (returns None)
         normalized_assignee = _normalize_user_id(assignee_email, "jira", config)
+        if not normalized_assignee:
+            continue
             
         status = ticket.fields.status.name
         
@@ -382,7 +431,10 @@ def _extract_github_engineer_metrics(github_data: Dict[str, Any], config: Dict[s
                 continue
                 
             # Normalize GitHub username to canonical form (Jira email)
+            # Skip if user is a bot (returns None)
             normalized_author = _normalize_user_id(author, "github", config)
+            if not normalized_author:
+                continue
             
             metrics = engineer_metrics[normalized_author]
             metrics['prs_created'] += 1
@@ -404,14 +456,16 @@ def _extract_github_engineer_metrics(github_data: Dict[str, Any], config: Dict[s
                 reviewer = review.get('user', {}).get('login')
                 if reviewer and reviewer != author:
                     normalized_reviewer = _normalize_user_id(reviewer, "github", config)
-                    engineer_metrics[normalized_reviewer]['reviews_given'] += 1
+                    if normalized_reviewer:  # Skip bots
+                        engineer_metrics[normalized_reviewer]['reviews_given'] += 1
             
             # Count comments given by this engineer
             for comment in pr.get('review_comments', []):
                 commenter = comment.get('user', {}).get('login')
                 if commenter and commenter != author:
                     normalized_commenter = _normalize_user_id(commenter, "github", config)
-                    engineer_metrics[normalized_commenter]['comments_given'] += 1
+                    if normalized_commenter:  # Skip bots
+                        engineer_metrics[normalized_commenter]['comments_given'] += 1
     
     # Process commits
     for repo, commits in github_data.get('commits', {}).items():
@@ -419,7 +473,8 @@ def _extract_github_engineer_metrics(github_data: Dict[str, Any], config: Dict[s
             author = commit.get('author', {}).get('login')
             if author:
                 normalized_author = _normalize_user_id(author, "github", config)
-                engineer_metrics[normalized_author]['commits'] += 1
+                if normalized_author:  # Skip bots
+                    engineer_metrics[normalized_author]['commits'] += 1
     
     return dict(engineer_metrics)
 
@@ -437,6 +492,7 @@ def _extract_jira_engineer_metrics(tickets: List[Any], start_date: str, end_date
         assignee_name = team_members.get(assignee_email, assignee_email) if assignee_email else 'Unassigned'
         
         # Normalize Jira email (already canonical form, but for consistency)
+        # Skip if user is a bot (returns None)
         normalized_assignee = _normalize_user_id(assignee_email, "jira", config) if assignee_email else None
         
         if assignee_name == 'Unassigned' or not normalized_assignee:
@@ -500,6 +556,87 @@ def _empty_jira_metrics() -> Dict[str, Any]:
         'current_wip': 0,
         'cycle_times': [],
         'avg_cycle_time': 0.0
+    }
+
+
+def filter_active_engineers(engineer_data: Dict[str, Dict[str, Any]], 
+                           trends: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """
+    Filter out engineers with insufficient activity to match official report standards.
+    
+    Args:
+        engineer_data: Raw engineer performance data
+        trends: Engineer trend analysis with totals
+        
+    Returns:
+        Filtered engineer data containing only active contributors
+    """
+    active_engineers = {}
+    
+    for engineer, data in engineer_data.items():
+        trend_data = trends.get(engineer, {})
+        weekly_totals = trend_data.get('weekly_totals', {})
+        
+        total_prs = weekly_totals.get('total_prs', 0)
+        total_tickets = weekly_totals.get('total_tickets', 0)
+        
+        # Include engineers with meaningful activity: ≥1 PR OR ≥3 tickets in quarter
+        if total_prs >= 1 or total_tickets >= 3:
+            active_engineers[engineer] = data
+    
+    return active_engineers
+
+
+def validate_data_quality(engineer_data: Dict[str, Dict[str, Any]], 
+                         trends: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Validate data quality against official report benchmarks.
+    
+    Args:
+        engineer_data: Engineer performance data
+        trends: Engineer trend analysis
+        
+    Returns:
+        Dictionary containing validation metrics and status
+    """
+    # Calculate totals from engineer data
+    total_prs = sum(trends.get(eng, {}).get('weekly_totals', {}).get('total_prs', 0) 
+                   for eng in engineer_data.keys())
+    total_tickets = sum(trends.get(eng, {}).get('weekly_totals', {}).get('total_tickets', 0) 
+                       for eng in engineer_data.keys())
+    total_contributors = len(engineer_data)
+    
+    # Official Q3 2025 benchmarks
+    official_prs = 92
+    official_tickets = 106
+    official_contributors_range = (8, 10)
+    
+    # Calculate validation status
+    pr_variance = abs(total_prs - official_prs) / official_prs * 100
+    ticket_variance = abs(total_tickets - official_tickets) / official_tickets * 100
+    contributors_in_range = official_contributors_range[0] <= total_contributors <= official_contributors_range[1]
+    
+    return {
+        'computed_totals': {
+            'prs': total_prs,
+            'tickets': total_tickets,
+            'contributors': total_contributors
+        },
+        'official_benchmarks': {
+            'prs': official_prs,
+            'tickets': official_tickets,
+            'contributors': f"{official_contributors_range[0]}-{official_contributors_range[1]}"
+        },
+        'validation_status': {
+            'pr_accuracy': pr_variance <= 5.0,  # Within 5%
+            'ticket_accuracy': ticket_variance <= 5.0,  # Within 5%
+            'contributor_count_valid': contributors_in_range,
+            'overall_valid': pr_variance <= 5.0 and ticket_variance <= 5.0 and contributors_in_range
+        },
+        'variance_percentages': {
+            'prs': pr_variance,
+            'tickets': ticket_variance
+        }
     }
 
 

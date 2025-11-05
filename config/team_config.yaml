@@ -1,0 +1,92 @@
+# Team Configuration - Single Source of Truth for Team Data
+# This file consolidates all team member information and mappings
+
+# Team members - comprehensive identity mapping
+# Each entry contains all identifiers for a person across systems
+team_members:
+  brad_smith:
+    display_name: "Brad Smith"
+    jira_email: "brasmith@redhat.com"
+    github_username: "infinitewarp"
+    
+  cory_chase:
+    display_name: "Cory Chase"
+    jira_email: "cochase@redhat.com"
+    github_username: "cmchase"
+    
+  alberto_bellotti:
+    display_name: "Alberto Bellotti" 
+    jira_email: "abellott@redhat.com"
+    github_username: "abellotti"
+    
+  nicole_aragao:
+    display_name: "Nicole dos Anjos Ragão"
+    jira_email: "naragao@redhat.com"
+    github_username: "nicolearagao"
+    
+  ruda_moura:
+    display_name: "Rudá Moura"
+    jira_email: "rmoura@redhat.com"
+    github_username: "ruda"
+    
+  mirek_dlugosz:
+    display_name: "Mirek Długosz"
+    jira_email: "mzalewsk@redhat.com"
+    github_username: "mirekdlugosz"
+    
+# Add new team members here following the same pattern:
+#  john_doe:
+#    display_name: "John Doe"
+#    jira_email: "john.doe@redhat.com"
+#    github_username: "johndoe"
+
+# Team categorization rules for Jira reports
+# Each category can have components, projects, keywords, and description
+team_categories:
+  Backend Development:
+    components:
+      - "Backend"
+      - "API"
+    keywords:
+      - "database"
+      - "service"
+    description: "Backend services and API development"
+
+  Frontend Development:
+    components:
+      - "Frontend"
+      - "UI"
+    keywords:
+      - "react"
+      - "typescript"
+    description: "Frontend and user interface work"
+
+  Quality Engineering:
+    components:
+      - "QE"
+      - "Testing"
+    projects:
+      - "TESTS"
+    description: "Quality engineering and testing"
+
+  DevOps:
+    keywords:
+      - "deployment"
+      - "infrastructure"
+      - "kubernetes"
+    description: "DevOps and infrastructure work"
+
+  Security:
+    keywords:
+      - "security"
+      - "vulnerability"
+      - "audit"
+    description: "Security-related work and vulnerability fixes"
+
+# Team sizing for estimation
+team_sizing:
+  "xsmall": 1
+  "small": 3
+  "medium": 9
+  "large": 27
+  "xlarge": 81

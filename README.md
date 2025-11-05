@@ -9,6 +9,7 @@ A comprehensive suite of tools for generating automated team summaries and perfo
 - **🐙 Weekly GitHub Reports** - Sprint-focused GitHub repository activity and contributor insights
 - **📆 Quarterly Jira Reports** - Long-term analysis with contributor performance metrics  
 - **📈 GitHub Quarterly Reports** - Comprehensive GitHub repository analysis and contributor tracking
+- **👤 Engineer Quarterly Performance** - Individual engineer tracking with weekly metrics, trend analysis, and coaching insights
 - **🔄 Cross-Platform Insights** - Combine Jira and GitHub data for complete development visibility
 
 ### 🚀 Advanced Capabilities
@@ -45,6 +46,7 @@ A comprehensive suite of tools for generating automated team summaries and perfo
 | **Weekly GitHub** | GitHub API | Weekly | `github_weekly_summary_YYYY-MM-DD_to_YYYY-MM-DD.md` | Sprint demos, code review insights |
 | **Quarterly Jira** | Jira API | Quarterly | `quarterly_summary_QX_YYYY.md` | Performance reviews, quarterly planning |
 | **GitHub Quarterly** | GitHub API | Quarterly | `github_quarterly_summary_QX_YYYY.md` | Code contribution analysis, developer insights |
+| **Engineer Performance** | Jira + GitHub | Quarterly | `engineer_quarterly_performance_QX_YYYY.md` | 1-on-1s, coaching, individual performance tracking |
 
 ### 1. Install Dependencies
 
@@ -139,6 +141,18 @@ cp config/github_config_example.yaml config/github_config.yaml
 ./run_github_quarterly_summary.sh 2025 4
 ```
 
+#### 👤 Engineer Quarterly Performance Reports
+```bash
+# Generate report for current quarter
+./run_engineer_quarterly_performance.sh
+
+# Generate report for specific quarter (Q2 2025)
+./run_engineer_quarterly_performance.sh 2025 2
+
+# Custom configuration
+./run_engineer_quarterly_performance.sh 2025 2 config/custom_config.yaml
+```
+
 ## 📁 Project Structure
 
 ```
@@ -147,13 +161,15 @@ team-reports/
 │   ├── jira_weekly_summary.py           # Weekly Jira reports  
 │   ├── github_weekly_summary.py         # Weekly GitHub reports
 │   ├── jira_quarterly_summary.py        # Quarterly Jira reports
-│   └── github_quarterly_summary.py      # GitHub quarterly reports
+│   ├── github_quarterly_summary.py      # GitHub quarterly reports
+│   └── engineer_quarterly_performance.py # Engineer performance reports
 ├── 🚀 Execution Scripts  
 │   ├── run_jira_weekly_summary.sh       # Weekly Jira report runner
 │   ├── run_github_weekly_summary.sh     # Weekly GitHub report runner
 │   ├── run_batch_weekly.sh              # Batch weekly report runner (Jira + GitHub)
 │   ├── run_jira_quarterly_summary.sh    # Quarterly Jira report runner
-│   └── run_github_quarterly_summary.sh  # GitHub quarterly report runner
+│   ├── run_github_quarterly_summary.sh  # GitHub quarterly report runner
+│   └── run_engineer_quarterly_performance.sh # Engineer performance runner
 ├── ⚙️ Configuration
 │   ├── env.template                     # Environment template
 │   ├── config/jira_config_example.yaml        # Jira configuration example
@@ -167,6 +183,10 @@ team-reports/
 │       ├── batch.py                   # Batch processing and date utilities
 │       ├── config.py                  # Configuration management
 │       ├── date.py                    # Date parsing and ranges
+│       ├── engineer_performance.py    # Engineer performance tracking
+│       ├── github_client.py           # GitHub API client
+│       ├── github.py                  # GitHub API utilities
+│       ├── jira_client.py             # Jira API client
 │       ├── jira.py                    # Jira API utilities
 │       ├── report.py                  # Report formatting and output
 │       └── ticket.py                  # Ticket categorization
@@ -181,7 +201,8 @@ team-reports/
 │       ├── jira_weekly_summary_*.md   # Weekly Jira reports
 │       ├── github_weekly_summary_*.md # Weekly GitHub reports
 │       ├── jira_quarterly_summary_*.md # Quarterly Jira reports
-│       └── github_quarterly_*.md      # GitHub quarterly reports
+│       ├── github_quarterly_*.md      # GitHub quarterly reports
+│       └── engineer_quarterly_performance_*.md # Engineer performance reports
 ├── 🔧 Dependencies
 │   ├── requirements.txt               # Python package dependencies
 │   └── venv/                         # Virtual environment (create this)
@@ -366,6 +387,32 @@ python3 github_quarterly_summary.py 2025 4
 python3 github_quarterly_summary.py 2025 4 custom_config.yaml
 ```
 
+### 👤 Engineer Quarterly Performance Reports
+
+**Shell Script (Recommended):**
+```bash
+# Current quarter
+./run_engineer_quarterly_performance.sh
+
+# Specific quarter (Q2 2025)
+./run_engineer_quarterly_performance.sh 2025 2
+
+# Custom configuration
+./run_engineer_quarterly_performance.sh 2025 2 config/custom_config.yaml
+```
+
+**Python Direct:**
+```bash
+# Current quarter
+python3 engineer_quarterly_performance.py
+
+# Specific quarter
+python3 engineer_quarterly_performance.py 2025 2
+
+# With custom config
+python3 engineer_quarterly_performance.py 2025 2 custom_config.yaml
+```
+
 ### 🔄 Batch Report Generation
 
 **Multi-Week Batch Processing:**
@@ -385,12 +432,13 @@ python3 github_quarterly_summary.py 2025 4 custom_config.yaml
 ./run_jira_weekly_summary.sh
 ./run_github_weekly_summary.sh
 
-# All quarterly reports (Jira + GitHub)
+# All quarterly reports (Jira + GitHub + Engineer Performance)
 ./run_jira_quarterly_summary.sh  
 ./run_github_quarterly_summary.sh
+./run_engineer_quarterly_performance.sh
 
 # Complete reporting suite
-./run_jira_weekly_summary.sh && ./run_github_weekly_summary.sh && ./run_jira_quarterly_summary.sh && ./run_github_quarterly_summary.sh
+./run_jira_weekly_summary.sh && ./run_github_weekly_summary.sh && ./run_jira_quarterly_summary.sh && ./run_github_quarterly_summary.sh && ./run_engineer_quarterly_performance.sh
 ```
 
 ## 📊 Report Output
@@ -508,6 +556,49 @@ All reports are generated in clean Markdown format with rich formatting, tables,
 | Jane Smith | 34 | 89 | +3,421 | -1,876 |
 ```
 
+### 👤 Engineer Quarterly Performance Reports
+
+**Features:**
+- **📊 Weekly Performance Tracking** - 13-week granular view of GitHub and Jira activity
+- **📈 Trend Analysis** - Performance trajectories (increasing/stable/decreasing patterns)
+- **🤝 Collaboration Metrics** - PR reviews, comments, and team engagement
+- **⚡ Velocity Tracking** - Commits, PRs, and Jira ticket completion rates
+- **💡 Coaching Insights** - Automated flags for performance concerns with actionable recommendations
+- **🔍 Cross-System View** - Unified GitHub and Jira metrics per engineer
+
+**Example Output:**
+```markdown
+# 👤 ENGINEER QUARTERLY PERFORMANCE: Q2 2025
+
+## 📊 EXECUTIVE SUMMARY
+- **Reporting Period:** Q2 2025 (13 weeks)
+- **Active Engineers:** 8
+- **Total Team Activity:** 234 PRs, 567 commits, 123 tickets completed
+
+### 🏆 Top Performers
+1. Jane Smith - High velocity, strong collaboration
+2. Bob Developer - Consistent output, improving trend
+
+### ⚠️ Coaching Priorities
+- 2 engineers with decreasing velocity trends
+- 1 engineer with low collaboration metrics
+
+## 👤 INDIVIDUAL ENGINEER ANALYSIS
+
+### Jane Smith
+
+#### 📈 Performance Trends
+- **Velocity:** ⬆️ Increasing (15% improvement over quarter)
+- **Collaboration:** ⬆️ Increasing (strong PR review activity)
+- **Consistency:** Stable week-over-week
+
+#### 📊 Weekly Metrics (13 weeks)
+| Week | PRs | Commits | Reviews | Tickets | Cycle Time |
+|------|-----|---------|---------|---------|------------|
+| W1   | 3   | 12      | 8       | 4       | 3.2 days   |
+| W2   | 4   | 15      | 10      | 5       | 2.8 days   |
+```
+
 ### 📁 Output Organization
 
 All reports are saved in the `Reports/` directory with consistent naming:
@@ -515,6 +606,7 @@ All reports are saved in the `Reports/` directory with consistent naming:
 - **Weekly GitHub**: `github_weekly_summary_2025-09-10_to_2025-09-16.md`
 - **Quarterly Jira**: `jira_quarterly_summary_Q4_2025.md`  
 - **GitHub Quarterly**: `github_quarterly_summary_Q4_2025.md`
+- **Engineer Performance**: `engineer_quarterly_performance_Q2_2025.md`
 
 ## ⚙️ Configuration
 
@@ -789,6 +881,26 @@ logging.basicConfig(level=logging.DEBUG)
 
 ### 🚀 Major New Features
 
+- **✅ Engineer Quarterly Performance Reports** - Individual engineer tracking and coaching insights
+  - Week-by-week performance tracking (13 weeks per quarter) with granular metrics
+  - Cross-platform data integration combining GitHub and Jira activity
+  - Automated trend analysis detecting increasing/stable/decreasing performance patterns
+  - Collaboration metrics including PR reviews, comments, and team engagement
+  - Configurable coaching thresholds with actionable insights for 1-on-1s
+  - Executive summary highlighting top performers and coaching priorities
+
+- **✅ Team Configuration Consolidation** - Single source of truth for team data
+  - Unified `team_config.yaml` consolidating all team member information
+  - Cross-system user mapping linking GitHub usernames to Jira emails
+  - Eliminates duplicate team member definitions across config files
+  - Shared team categorization rules and sizing estimates
+
+- **✅ Resolution Date Tracking** - Accurate completion date filtering
+  - Jira reports now use `resolutiondate` instead of `updated` for precise tracking
+  - Shows tickets actually resolved during period, not just updated
+  - More accurate weekly and quarterly completion metrics
+  - Maintains fallback to `updated` date when resolution date unavailable
+
 - **✅ GitHub Weekly Reports** - Sprint-focused GitHub repository analysis system
   - Weekly pull request, commit, and issue activity tracking  
   - Daily activity patterns and contributor insights for sprint reviews
@@ -815,12 +927,14 @@ logging.basicConfig(level=logging.DEBUG)
 
 ### 🛠️ Technical Improvements
 
+- **✅ Bot Filtering** - Automatic filtering of bot accounts from reports with configurable patterns
 - **✅ Multi-Platform Integration** - Unified credential management for Jira and GitHub APIs
-- **✅ Enhanced Configuration** - Separate config files for different report types
+- **✅ Enhanced Configuration** - Separate config files for different report types with layered precedence
 - **✅ Shell Script Automation** - Convenient execution scripts with error handling
 - **✅ Rich Report Output** - Enhanced Markdown formatting with tables and visual indicators
 - **✅ Improved Data Handling** - Robust API pagination and rate limiting
 - **✅ Comprehensive Documentation** - Detailed guides for each report type
+- **✅ Performance Optimization** - Efficient weekly data aggregation and memory-conscious processing
 
 ## 🤝 Contributing
 

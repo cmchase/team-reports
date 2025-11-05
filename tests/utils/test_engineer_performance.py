@@ -32,7 +32,11 @@ from utils.engineer_performance import (
     _extract_jira_engineer_metrics,
     _empty_github_metrics,
     _empty_jira_metrics,
-    _calculate_trend
+    _calculate_trend,
+    _is_bot_user,
+    _normalize_user_id,
+    filter_active_engineers,
+    validate_data_quality
 )
 
 
@@ -506,6 +510,281 @@ class TestEngineerPerformanceIntegration(unittest.TestCase):
             week_data = engineer_data['john.doe']['weeks']['2025-04-07']
             self.assertIn('github', week_data)
             self.assertIn('jira', week_data)
+
+
+class TestBotDetection(unittest.TestCase):
+    """Test bot detection and filtering functionality."""
+    
+    def test_is_bot_user_basic_patterns(self):
+        """Test basic bot detection patterns."""
+        config = {
+            'bots': {
+                'patterns': ['.*bot.*', 'konflux-.*', 'dependabot']
+            }
+        }
+        
+        # Should detect bots
+        self.assertTrue(_is_bot_user('github-bot', config))
+        self.assertTrue(_is_bot_user('konflux-internal-p02', config))
+        self.assertTrue(_is_bot_user('dependabot', config))
+        self.assertTrue(_is_bot_user('sourcery-ai[bot]', config))
+        
+        # Should not detect regular users
+        self.assertFalse(_is_bot_user('john.doe', config))
+        self.assertFalse(_is_bot_user('jane.smith@company.com', config))
+        self.assertFalse(_is_bot_user('mirekdlugosz', config))
+    
+    def test_is_bot_user_case_insensitive(self):
+        """Test that bot detection is case insensitive."""
+        config = {
+            'bots': {
+                'patterns': ['.*BOT.*']
+            }
+        }
+        
+        self.assertTrue(_is_bot_user('GitHub-Bot', config))
+        self.assertTrue(_is_bot_user('github-bot', config))
+        self.assertTrue(_is_bot_user('GITHUB-BOT', config))
+    
+    def test_is_bot_user_empty_patterns(self):
+        """Test bot detection with empty patterns."""
+        config = {'bots': {'patterns': []}}
+        
+        self.assertFalse(_is_bot_user('any-user', config))
+        self.assertFalse(_is_bot_user('github-bot', config))
+    
+    def test_is_bot_user_invalid_regex(self):
+        """Test bot detection handles invalid regex gracefully."""
+        config = {
+            'bots': {
+                'patterns': ['[invalid', '.*bot.*']  # First pattern is invalid regex
+            }
+        }
+        
+        # Should still work with valid patterns
+        self.assertTrue(_is_bot_user('github-bot', config))
+        self.assertFalse(_is_bot_user('john.doe', config))
+    
+    def test_normalize_user_id_bot_filtering(self):
+        """Test that _normalize_user_id filters out bots."""
+        config = {
+            'bots': {
+                'patterns': ['.*bot.*', 'konflux-.*']
+            },
+            'user_mapping': {
+                'github_to_jira': {
+                    'john.doe': 'john.doe@company.com'
+                }
+            }
+        }
+        
+        # Regular users should be normalized
+        self.assertEqual(_normalize_user_id('john.doe', 'github', config), 'john.doe@company.com')
+        self.assertEqual(_normalize_user_id('jane@company.com', 'jira', config), 'jane@company.com')
+        
+        # Bots should return None
+        self.assertIsNone(_normalize_user_id('github-bot', 'github', config))
+        self.assertIsNone(_normalize_user_id('konflux-internal-p02', 'github', config))
+        self.assertIsNone(_normalize_user_id('sourcery-ai[bot]', 'jira', config))
+    
+    def test_normalize_user_id_cross_system_mapping(self):
+        """Test cross-system user identity mapping."""
+        config = {
+            'bots': {'patterns': []},
+            'user_mapping': {
+                'github_to_jira': {
+                    'infinitewarp': 'brasmith@redhat.com',
+                    'nicolearagao': 'naragao@redhat.com',
+                    'mirekdlugosz': 'mzalewsk@redhat.com'
+                }
+            }
+        }
+        
+        # GitHub users should map to Jira emails
+        self.assertEqual(_normalize_user_id('infinitewarp', 'github', config), 'brasmith@redhat.com')
+        self.assertEqual(_normalize_user_id('nicolearagao', 'github', config), 'naragao@redhat.com')
+        self.assertEqual(_normalize_user_id('mirekdlugosz', 'github', config), 'mzalewsk@redhat.com')
+        
+        # Unmapped GitHub users should remain unchanged
+        self.assertEqual(_normalize_user_id('unknown-user', 'github', config), 'unknown-user')
+        
+        # Jira users should remain unchanged (canonical form)
+        self.assertEqual(_normalize_user_id('brasmith@redhat.com', 'jira', config), 'brasmith@redhat.com')
+
+
+class TestActiveEngineerFiltering(unittest.TestCase):
+    """Test filtering of active engineers based on activity thresholds."""
+    
+    def test_filter_active_engineers_basic(self):
+        """Test basic active engineer filtering."""
+        engineer_data = {
+            'high.activity': {'weeks': {}},
+            'medium.activity': {'weeks': {}},
+            'low.activity': {'weeks': {}}
+        }
+        
+        trends = {
+            'high.activity': {'weekly_totals': {'total_prs': 5, 'total_tickets': 8}},
+            'medium.activity': {'weekly_totals': {'total_prs': 2, 'total_tickets': 1}},
+            'low.activity': {'weekly_totals': {'total_prs': 0, 'total_tickets': 1}}
+        }
+        
+        active_engineers = filter_active_engineers(engineer_data, trends)
+        
+        # Should include engineers with ≥1 PR OR ≥3 tickets
+        self.assertIn('high.activity', active_engineers)  # 5 PRs, 8 tickets
+        self.assertIn('medium.activity', active_engineers)  # 2 PRs, 1 ticket (≥1 PR)
+        self.assertNotIn('low.activity', active_engineers)  # 0 PRs, 1 ticket (below threshold)
+    
+    def test_filter_active_engineers_edge_cases(self):
+        """Test edge cases for active engineer filtering."""
+        engineer_data = {
+            'exactly.one.pr': {'weeks': {}},
+            'exactly.three.tickets': {'weeks': {}},
+            'zero.activity': {'weeks': {}}
+        }
+        
+        trends = {
+            'exactly.one.pr': {'weekly_totals': {'total_prs': 1, 'total_tickets': 0}},
+            'exactly.three.tickets': {'weekly_totals': {'total_prs': 0, 'total_tickets': 3}},
+            'zero.activity': {'weekly_totals': {'total_prs': 0, 'total_tickets': 0}}
+        }
+        
+        active_engineers = filter_active_engineers(engineer_data, trends)
+        
+        # Should include engineers at threshold boundaries
+        self.assertIn('exactly.one.pr', active_engineers)
+        self.assertIn('exactly.three.tickets', active_engineers)
+        self.assertNotIn('zero.activity', active_engineers)
+
+
+class TestDataQualityValidation(unittest.TestCase):
+    """Test data quality validation against official benchmarks."""
+    
+    def test_validate_data_quality_perfect_match(self):
+        """Test validation with perfect data alignment."""
+        engineer_data = {
+            'eng1': {'weeks': {}},
+            'eng2': {'weeks': {}},
+            'eng3': {'weeks': {}},
+            'eng4': {'weeks': {}},
+            'eng5': {'weeks': {}},
+            'eng6': {'weeks': {}},
+            'eng7': {'weeks': {}},
+            'eng8': {'weeks': {}}
+        }
+        
+        trends = {
+            'eng1': {'weekly_totals': {'total_prs': 12, 'total_tickets': 13}},
+            'eng2': {'weekly_totals': {'total_prs': 11, 'total_tickets': 12}},
+            'eng3': {'weekly_totals': {'total_prs': 10, 'total_tickets': 11}},
+            'eng4': {'weekly_totals': {'total_prs': 10, 'total_tickets': 10}},
+            'eng5': {'weekly_totals': {'total_prs': 9, 'total_tickets': 10}},
+            'eng6': {'weekly_totals': {'total_prs': 8, 'total_tickets': 9}},
+            'eng7': {'weekly_totals': {'total_prs': 8, 'total_tickets': 8}},
+            'eng8': {'weekly_totals': {'total_prs': 24, 'total_tickets': 33}}  # Total: 92 PRs, 106 tickets
+        }
+        
+        validation = validate_data_quality(engineer_data, trends)
+        
+        # Should show perfect alignment
+        self.assertEqual(validation['computed_totals']['prs'], 92)
+        self.assertEqual(validation['computed_totals']['tickets'], 106)
+        self.assertEqual(validation['computed_totals']['contributors'], 8)
+        
+        self.assertTrue(validation['validation_status']['pr_accuracy'])
+        self.assertTrue(validation['validation_status']['ticket_accuracy'])
+        self.assertTrue(validation['validation_status']['contributor_count_valid'])
+        self.assertTrue(validation['validation_status']['overall_valid'])
+        
+        self.assertEqual(validation['variance_percentages']['prs'], 0.0)
+        self.assertEqual(validation['variance_percentages']['tickets'], 0.0)
+    
+    def test_validate_data_quality_with_variance(self):
+        """Test validation with acceptable variance."""
+        engineer_data = {
+            'eng1': {'weeks': {}},
+            'eng2': {'weeks': {}},
+            'eng3': {'weeks': {}},
+            'eng4': {'weeks': {}},
+            'eng5': {'weeks': {}},
+            'eng6': {'weeks': {}},
+            'eng7': {'weeks': {}},
+            'eng8': {'weeks': {}},
+            'eng9': {'weeks': {}}  # 9 contributors (within range)
+        }
+        
+        trends = {
+            'eng1': {'weekly_totals': {'total_prs': 11, 'total_tickets': 12}},
+            'eng2': {'weekly_totals': {'total_prs': 11, 'total_tickets': 12}},
+            'eng3': {'weekly_totals': {'total_prs': 11, 'total_tickets': 12}},
+            'eng4': {'weekly_totals': {'total_prs': 11, 'total_tickets': 12}},
+            'eng5': {'weekly_totals': {'total_prs': 11, 'total_tickets': 12}},
+            'eng6': {'weekly_totals': {'total_prs': 11, 'total_tickets': 12}},
+            'eng7': {'weekly_totals': {'total_prs': 11, 'total_tickets': 12}},
+            'eng8': {'weekly_totals': {'total_prs': 11, 'total_tickets': 12}},
+            'eng9': {'weekly_totals': {'total_prs': 7, 'total_tickets': 10}}  # Total: 95 PRs, 106 tickets
+        }
+        
+        validation = validate_data_quality(engineer_data, trends)
+        
+        # Should show small acceptable variance
+        self.assertEqual(validation['computed_totals']['prs'], 95)  # 8*11 + 7 = 95
+        self.assertEqual(validation['computed_totals']['tickets'], 106)  # 8*12 + 10 = 106
+        self.assertEqual(validation['computed_totals']['contributors'], 9)
+        
+        # 95 vs 92 = 3.3% variance (within 5%)
+        # 106 vs 106 = 0% variance (within 5%)
+        self.assertTrue(validation['validation_status']['pr_accuracy'])  # Within 5%
+        self.assertTrue(validation['validation_status']['ticket_accuracy'])  # Exact match
+        self.assertTrue(validation['validation_status']['contributor_count_valid'])
+        self.assertTrue(validation['validation_status']['overall_valid'])  # All passed
+    
+    def test_validate_data_quality_excessive_variance(self):
+        """Test validation with excessive variance."""
+        engineer_data = {
+            'eng1': {'weeks': {}},
+            'eng2': {'weeks': {}},
+            'eng3': {'weeks': {}},
+            'eng4': {'weeks': {}},
+            'eng5': {'weeks': {}},
+            'eng6': {'weeks': {}},
+            'eng7': {'weeks': {}},
+            'eng8': {'weeks': {}},
+            'eng9': {'weeks': {}},
+            'eng10': {'weeks': {}},
+            'eng11': {'weeks': {}},
+            'eng12': {'weeks': {}}  # 12 contributors (outside range)
+        }
+        
+        trends = {
+            'eng1': {'weekly_totals': {'total_prs': 15, 'total_tickets': 15}},
+            'eng2': {'weekly_totals': {'total_prs': 15, 'total_tickets': 15}},
+            'eng3': {'weekly_totals': {'total_prs': 15, 'total_tickets': 15}},
+            'eng4': {'weekly_totals': {'total_prs': 15, 'total_tickets': 15}},
+            'eng5': {'weekly_totals': {'total_prs': 15, 'total_tickets': 15}},
+            'eng6': {'weekly_totals': {'total_prs': 15, 'total_tickets': 15}},
+            'eng7': {'weekly_totals': {'total_prs': 15, 'total_tickets': 15}},
+            'eng8': {'weekly_totals': {'total_prs': 15, 'total_tickets': 15}},
+            'eng9': {'weekly_totals': {'total_prs': 15, 'total_tickets': 15}},
+            'eng10': {'weekly_totals': {'total_prs': 15, 'total_tickets': 15}},
+            'eng11': {'weekly_totals': {'total_prs': 15, 'total_tickets': 15}},
+            'eng12': {'weekly_totals': {'total_prs': 15, 'total_tickets': 15}}  # Total: 180 PRs, 180 tickets
+        }
+        
+        validation = validate_data_quality(engineer_data, trends)
+        
+        # Should show excessive variance
+        self.assertEqual(validation['computed_totals']['prs'], 180)
+        self.assertEqual(validation['computed_totals']['tickets'], 180)
+        self.assertEqual(validation['computed_totals']['contributors'], 12)
+        
+        # 180 vs 92 = 95.7% variance (way over 5%)
+        # 180 vs 106 = 69.8% variance (way over 5%)
+        self.assertFalse(validation['validation_status']['pr_accuracy'])
+        self.assertFalse(validation['validation_status']['ticket_accuracy'])
+        self.assertFalse(validation['validation_status']['contributor_count_valid'])
+        self.assertFalse(validation['validation_status']['overall_valid'])
 
 
 if __name__ == '__main__':

@@ -36,7 +36,9 @@ from utils.engineer_performance import (
     collect_weekly_engineer_data, 
     compute_engineer_trends, 
     generate_coaching_insights,
-    format_weekly_metrics_table
+    format_weekly_metrics_table,
+    filter_active_engineers,
+    validate_data_quality
 )
 
 # Load environment variables
@@ -68,6 +70,14 @@ class EngineerQuarterlyPerformance:
         print("📈 Computing performance trends...")
         trends = compute_engineer_trends(engineer_data)
         
+        # Filter out low-activity engineers to match official reports
+        print("🔍 Filtering active contributors...")
+        engineer_data = filter_active_engineers(engineer_data, trends)
+        
+        # Validate data quality against official benchmarks
+        print("✅ Validating data quality...")
+        data_quality = validate_data_quality(engineer_data, trends)
+        
         print("💡 Generating coaching insights...")
         coaching_insights = generate_coaching_insights(engineer_data, trends, self.config)
         
@@ -79,6 +89,9 @@ class EngineerQuarterlyPerformance:
         
         # Executive Summary
         report_sections.append(self._generate_executive_summary(engineer_data, trends, coaching_insights))
+        
+        # Data Quality Validation
+        report_sections.append(self._generate_data_quality_section(data_quality))
         
         # Individual Engineer Analysis
         report_sections.append(self._generate_individual_analysis(engineer_data, trends, coaching_insights))
@@ -186,6 +199,51 @@ Please check your configuration and try again.
             section += f"{i}. **{name}** - {output} deliverables {trend_icon}\n"
         
         section += "\n---\n"
+        return section
+    
+    def _generate_data_quality_section(self, data_quality: Dict[str, Any]) -> str:
+        """Generate data quality validation section."""
+        computed = data_quality['computed_totals']
+        benchmarks = data_quality['official_benchmarks']
+        validation = data_quality['validation_status']
+        variance = data_quality['variance_percentages']
+        
+        section = f"""## 🔍 Data Quality Validation
+        
+### Alignment with Official Q3 2025 Reports
+
+| Metric | Computed | Official Benchmark | Variance | Status |
+|--------|----------|-------------------|----------|--------|
+| **PRs Merged** | {computed['prs']} | {benchmarks['prs']} | {variance['prs']:.1f}% | {'✅' if validation['pr_accuracy'] else '⚠️'} |
+| **Tickets Completed** | {computed['tickets']} | {benchmarks['tickets']} | {variance['tickets']:.1f}% | {'✅' if validation['ticket_accuracy'] else '⚠️'} |
+| **Active Contributors** | {computed['contributors']} | {benchmarks['contributors']} | — | {'✅' if validation['contributor_count_valid'] else '⚠️'} |
+
+### Data Quality Status
+
+"""
+        
+        if validation['overall_valid']:
+            section += "✅ **EXCELLENT**: All metrics align with official reports (within 5% variance)\n\n"
+        else:
+            section += "⚠️ **NEEDS ATTENTION**: Some metrics deviate from official benchmarks\n\n"
+            
+            if not validation['pr_accuracy']:
+                section += f"- PR count variance: {variance['prs']:.1f}% (target: <5%)\n"
+            if not validation['ticket_accuracy']:
+                section += f"- Ticket count variance: {variance['tickets']:.1f}% (target: <5%)\n"
+            if not validation['contributor_count_valid']:
+                section += f"- Contributor count outside expected range: {computed['contributors']} (target: {benchmarks['contributors']})\n"
+            section += "\n"
+        
+        section += """### Data Processing Notes
+
+- **Bot Exclusion**: Automated accounts filtered using regex patterns
+- **Identity Consolidation**: Cross-system user mapping applied (GitHub ↔ Jira)
+- **Activity Threshold**: Engineers with <1 PR AND <3 tickets excluded
+- **Date Alignment**: Uses same date ranges as official quarterly reports
+
+---
+"""
         return section
     
     def _generate_individual_analysis(self, engineer_data: Dict[str, Any], 
