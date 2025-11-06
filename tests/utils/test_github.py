@@ -7,7 +7,7 @@ functionality for delivery metrics.
 
 import pytest
 from datetime import datetime, timezone
-from utils.github import (
+from team_reports.utils.github import (
     compute_pr_lead_time_hours,
     compute_pr_lead_time_stats,
     is_trivial_pr,

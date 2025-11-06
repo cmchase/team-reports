@@ -1,6 +1,11 @@
 #!/bin/bash
 
 # =============================================================================
+#
+# MODERN CLI: This script is maintained for backwards compatibility.
+# New usage: team-reports [jira|github|engineer] [weekly|quarterly|performance] [OPTIONS]
+# Example: team-reports jira weekly
+#
 # Quarterly Team Summary Script
 # =============================================================================
 # 

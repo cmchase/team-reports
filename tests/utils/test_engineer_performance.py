@@ -22,7 +22,7 @@ import os
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, project_root)
 
-from utils.engineer_performance import (
+from team_reports.utils.engineer_performance import (
     generate_weekly_date_ranges,
     collect_weekly_engineer_data,
     compute_engineer_trends,

@@ -1,6 +1,11 @@
 #!/bin/bash
 
 # GitHub Quarterly Summary Runner
+#
+# MODERN CLI: This script is maintained for backwards compatibility.
+# New usage: team-reports [jira|github|engineer] [weekly|quarterly|performance] [OPTIONS]
+# Example: team-reports jira weekly
+#
 # Generates quarterly reports from GitHub repositories with error handling and setup
 
 set -e  # Exit on any error

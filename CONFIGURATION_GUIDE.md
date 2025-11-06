@@ -42,6 +42,86 @@ nano config/my_github_config.yaml
 python3 jira_weekly_summary.py 2025-07-15 2025-07-22 config/my_jira_config.yaml
 ```
 
+## ⚙️ Credential Management
+
+team-reports v1.0 introduces flexible credential management with clear precedence rules.
+
+### Credential Precedence Order
+
+Credentials are resolved in this order (highest to lowest priority):
+
+1. **Constructor Parameters** - Passed directly to report classes
+2. **Environment Variables** - Set in your shell or CI/CD system
+3. **.env File** - Loaded via python-dotenv
+
+This allows flexible deployment across different environments.
+
+### Method 1: .env File (Traditional)
+
+Create a `.env` file in the project root:
+
+```bash
+JIRA_SERVER=https://your-company.atlassian.net
+JIRA_EMAIL=your-email@company.com
+JIRA_API_TOKEN=your-jira-token
+GITHUB_TOKEN=your-github-token
+```
+
+Use without passing credentials:
+```python
+from team_reports import WeeklyTeamSummary
+
+report = WeeklyTeamSummary(config_file='config/jira_config.yaml')
+report.initialize()
+```
+
+### Method 2: Environment Variables
+
+Set credentials in your environment:
+```bash
+export JIRA_SERVER="https://company.atlassian.net"
+export JIRA_EMAIL="user@company.com"
+export JIRA_API_TOKEN="token"
+export GITHUB_TOKEN="token"
+```
+
+Useful for CI/CD pipelines and containers.
+
+### Method 3: Direct Parameters (Recommended for Libraries)
+
+Pass credentials explicitly:
+```python
+from team_reports import WeeklyTeamSummary
+
+report = WeeklyTeamSummary(
+    config_file='config/jira_config.yaml',
+    jira_server='https://company.atlassian.net',
+    jira_email='user@company.com',
+    jira_token='your-token'
+)
+report.initialize()
+```
+
+Best for:
+- Cloud functions (AWS Lambda, Google Cloud Functions)
+- CI/CD secrets management
+- Integration with secret vaults (AWS Secrets Manager, HashiCorp Vault)
+- Multi-tenant applications
+
+### CLI Credential Options
+
+The CLI supports credential overrides:
+
+```bash
+team-reports jira weekly \
+  --jira-server https://company.atlassian.net \
+  --jira-email user@company.com \
+  --jira-token YOUR_TOKEN
+
+team-reports github weekly \
+  --github-token YOUR_TOKEN
+```
+
 ## ⚙️ Configuration File Structure
 
 ### Team Configuration (team_config.yaml)

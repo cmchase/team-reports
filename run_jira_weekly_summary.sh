@@ -1,11 +1,24 @@
 #!/bin/bash
 # Weekly Team Summary Runner
 # Convenient wrapper script for generating Jira team summaries
+#
+# MODERN CLI: This script is maintained for backwards compatibility.
+# New usage: team-reports [jira|github|engineer] [weekly|quarterly|performance] [OPTIONS]
+# Example: team-reports jira weekly
+#
+# 
+# NOTE: This script now uses the team-reports CLI package.
+# For new projects, use: team-reports jira weekly [OPTIONS]
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SUMMARY_SCRIPT="$SCRIPT_DIR/jira_weekly_summary.py"
+
+# Check if team-reports CLI is available
+if ! command -v team-reports &> /dev/null; then
+    echo "⚠️  team-reports CLI not found. Installing package..."
+    pip install -e "$SCRIPT_DIR"
+fi
 
 # Colors for output
 RED='\033[0;31m'
@@ -82,16 +95,14 @@ case "${1:-current}" in
         ;;
     "current"|"this"|"")
         echo -e "${BLUE}📅 Generating summary for current week...${NC}"
-        check_venv
-        python3 "$SUMMARY_SCRIPT"
+        team-reports jira weekly
         ;;
     "last")
         echo -e "${BLUE}📅 Generating summary for last week...${NC}"
         today=$(date +"%Y-%m-%d")
         last_monday=$(get_monday "$(date -d "$today - 7 days" +"%Y-%m-%d")")
         last_sunday=$(add_days "$last_monday" 6)
-        check_venv
-        python3 "$SUMMARY_SCRIPT" "$last_monday" "$last_sunday"
+        team-reports jira weekly "$last_monday" "$last_sunday"
         ;;
     *[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]*)
         # Date format detected
@@ -105,8 +116,7 @@ case "${1:-current}" in
             end_date=$(add_days "$start_date" 6)
             echo -e "${BLUE}📅 Generating summary for week starting $start_date (to $end_date)...${NC}"
         fi
-        check_venv
-        python3 "$SUMMARY_SCRIPT" "$start_date" "$end_date"
+        team-reports jira weekly "$start_date" "$end_date"
         ;;
     *)
         echo -e "${RED}Error: Unknown option '$1'${NC}"

@@ -1,6 +1,11 @@
 #!/bin/bash
 # Batch Weekly Report Generator
 # Generate multiple weekly reports efficiently for Jira or GitHub data sources
+#
+# MODERN CLI: This script is maintained for backwards compatibility.
+# New usage: team-reports [jira|github|engineer] [weekly|quarterly|performance] [OPTIONS]
+# Example: team-reports jira weekly
+#
 
 set -e
 

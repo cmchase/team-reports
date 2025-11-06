@@ -24,6 +24,39 @@ A comprehensive suite of tools for generating automated team summaries and perfo
 
 ## 🚀 Quick Start
 
+### Installation
+
+team-reports can be used as a standalone tool or installed as a Python package.
+
+#### Option 1: Standalone Usage (Traditional)
+
+```bash
+# Clone repository
+git clone https://github.com/cmchase/team-reports.git
+cd team-reports
+
+# Install dependencies
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+#### Option 2: Package Installation (Recommended)
+
+```bash
+# Install from GitHub
+pip install git+https://github.com/cmchase/team-reports.git
+
+# Or install locally in development mode
+cd team-reports
+pip install -e .
+```
+
+After installation, you get:
+- Modern `team-reports` CLI command
+- Importable Python library for custom integrations
+- All existing shell scripts continue to work
+
 ### Prerequisites
 
 - Python 3.8 or higher
@@ -31,9 +64,17 @@ A comprehensive suite of tools for generating automated team summaries and perfo
 - **For GitHub Reports**: GitHub account with Personal Access Token
 - **For Both**: Virtual environment recommended
 
+### Usage Methods
+
+team-reports supports three usage methods:
+
+1. **Modern CLI** (Recommended): `team-reports jira weekly`
+2. **Shell Scripts** (Backward Compatible): `./run_jira_weekly_summary.sh`
+3. **Python Library** (For Integration): `from team_reports import WeeklyTeamSummary`
+
 ### Setup Steps
 
-1. **Install Dependencies** - Set up Python environment and install packages
+1. **Install Package** - Choose standalone or package installation
 2. **Configure Credentials** - Set up API access for Jira and/or GitHub
 3. **Configure Report Settings** - Customize configurations for each report type
 4. **Generate Reports** - Start creating automated summaries
@@ -47,6 +88,72 @@ A comprehensive suite of tools for generating automated team summaries and perfo
 | **Quarterly Jira** | Jira API | Quarterly | `quarterly_summary_QX_YYYY.md` | Performance reviews, quarterly planning |
 | **GitHub Quarterly** | GitHub API | Quarterly | `github_quarterly_summary_QX_YYYY.md` | Code contribution analysis, developer insights |
 | **Engineer Performance** | Jira + GitHub | Quarterly | `engineer_quarterly_performance_QX_YYYY.md` | 1-on-1s, coaching, individual performance tracking |
+
+## 🎮 Modern CLI Usage
+
+After installing the package, use the unified `team-reports` command:
+
+```bash
+# Jira reports
+team-reports jira weekly                          # Current week
+team-reports jira weekly 2025-01-01 2025-01-07   # Specific dates
+team-reports jira quarterly                       # Current quarter
+team-reports jira quarterly 2025 4                # Q4 2025
+
+# GitHub reports
+team-reports github weekly                        # Current week
+team-reports github quarterly                     # Current quarter
+team-reports github quarterly 2025 4              # Q4 2025
+
+# Engineer performance reports
+team-reports engineer performance                 # Current quarter
+team-reports engineer performance 2025 2          # Q2 2025
+
+# With options
+team-reports jira weekly --config custom.yaml
+team-reports jira weekly --jira-token YOUR_TOKEN
+team-reports github weekly --github-token YOUR_TOKEN
+
+# Get help
+team-reports --help
+team-reports jira weekly --help
+```
+
+## 📚 Library Usage
+
+Use team-reports in your Python projects:
+
+```python
+from team_reports import WeeklyTeamSummary
+
+# With .env credentials
+report = WeeklyTeamSummary(config_file='config/jira_config.yaml')
+report.initialize()
+tickets = report.fetch_tickets('2025-01-01', '2025-01-07')
+summary = report.generate_summary_report(tickets, '2025-01-01', '2025-01-07')
+
+# Or with explicit credentials (no .env needed)
+report = WeeklyTeamSummary(
+    config_file='config/jira_config.yaml',
+    jira_server='https://company.atlassian.net',
+    jira_email='user@company.com',
+    jira_token='your-token'
+)
+report.initialize()
+```
+
+**Available Classes:**
+```python
+from team_reports import (
+    WeeklyTeamSummary,           # Jira weekly reports
+    QuarterlyJiraSummary,         # Jira quarterly reports
+    GithubWeeklySummary,          # GitHub weekly reports
+    GithubQuarterlySummary,       # GitHub quarterly reports
+    EngineerQuarterlyPerformance  # Engineer performance reports
+)
+```
+
+See [LIBRARY_USAGE.md](LIBRARY_USAGE.md) for complete API documentation and examples.
 
 ### 1. Install Dependencies
 
@@ -798,6 +905,8 @@ save_report(content, filename)
 
 | Document | Purpose | Audience |
 |----------|---------|----------|  
+| **[LIBRARY_USAGE.md](LIBRARY_USAGE.md)** | Python library API and integration examples | Developers |
+| **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** | Upgrading from standalone to package | Existing users |
 | **[WEEKLY_SUMMARY_README.md](WEEKLY_SUMMARY_README.md)** | Detailed weekly reports guide | End users |
 | **[GITHUB_QUARTERLY_README.md](GITHUB_QUARTERLY_README.md)** | GitHub reports comprehensive guide | End users |
 | **[CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)** | Advanced configuration options | Power users |
@@ -880,6 +989,14 @@ logging.basicConfig(level=logging.DEBUG)
 ## 🆕 Recent Updates
 
 ### 🚀 Major New Features
+
+- **✅ Package Refactor (v1.0)** - Pip-installable with modern CLI and library API
+  - Install from GitHub: `pip install git+https://github.com/cmchase/team-reports.git`
+  - Modern CLI: `team-reports jira weekly`, `team-reports github quarterly`, etc.
+  - Importable library: `from team_reports import WeeklyTeamSummary`
+  - Credential passing without .env files for CI/CD and cloud environments
+  - Full backward compatibility with existing shell scripts and workflows
+  - See [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) and [LIBRARY_USAGE.md](LIBRARY_USAGE.md)
 
 - **✅ Engineer Quarterly Performance Reports** - Individual engineer tracking and coaching insights
   - Week-by-week performance tracking (13 weeks per quarter) with granular metrics

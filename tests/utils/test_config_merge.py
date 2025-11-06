@@ -15,7 +15,7 @@ from pathlib import Path
 # Add project root to Python path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
-from utils.config import (
+from team_reports.utils.config import (
     load_default_config,
     load_user_configs, 
     load_env_overrides,

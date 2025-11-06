@@ -14,7 +14,7 @@ import os
 # Add project root to Python path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
-from utils.date import (
+from team_reports.utils.date import (
     parse_date_args,
     get_current_week,
     get_last_week, 

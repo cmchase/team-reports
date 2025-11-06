@@ -14,7 +14,7 @@ from datetime import datetime
 # Add project root to Python path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
-from utils.report import (
+from team_reports.utils.report import (
     format_table_row,
     create_table_header,
     group_tickets_by_status,

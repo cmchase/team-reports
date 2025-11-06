@@ -1,6 +1,11 @@
 #!/bin/bash
 
 # Engineer Quarterly Performance Report Generator
+#
+# MODERN CLI: This script is maintained for backwards compatibility.
+# New usage: team-reports [jira|github|engineer] [weekly|quarterly|performance] [OPTIONS]
+# Example: team-reports jira weekly
+#
 # Usage: ./run_engineer_quarterly_performance.sh [year] [quarter] [config_file]
 # Examples:
 #   ./run_engineer_quarterly_performance.sh 2025 2

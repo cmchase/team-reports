@@ -14,7 +14,7 @@ import os
 # Add project root to Python path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
-from utils.jira import compute_cycle_time_days, compute_cycle_time_stats
+from team_reports.utils.jira import compute_cycle_time_days, compute_cycle_time_stats
 
 
 class TestComputeCycleTimeDays:

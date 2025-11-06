@@ -7,7 +7,7 @@ for multi-week report generation workflows.
 
 import pytest
 from datetime import date, timedelta
-from utils.batch import (
+from team_reports.utils.batch import (
     get_monday, add_days, add_weeks, validate_date_format,
     generate_weekly_date_ranges, generate_last_n_weeks_ranges,
     generate_n_weeks_from_date_ranges, parse_batch_arguments

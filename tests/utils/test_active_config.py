@@ -13,7 +13,7 @@ import os
 # Add project root to Python path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
-from utils.report import (
+from team_reports.utils.report import (
     redact_secrets,
     generate_config_hash,
     render_active_config
