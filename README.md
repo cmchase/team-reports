@@ -83,9 +83,9 @@ team-reports supports three usage methods:
 
 | Report Type | Source | Frequency | Output | Use Case |
 |-------------|--------|-----------|--------|----------|
-| **Weekly Jira** | Jira API | Weekly | `team_summary_YYYY-MM-DD_to_YYYY-MM-DD.md` | Sprint reviews, weekly standup prep |
+| **Weekly Jira** | Jira API | Weekly | `jira_weekly_summary_YYYY-MM-DD_to_YYYY-MM-DD.md` | Sprint reviews, weekly standup prep |
 | **Weekly GitHub** | GitHub API | Weekly | `github_weekly_summary_YYYY-MM-DD_to_YYYY-MM-DD.md` | Sprint demos, code review insights |
-| **Quarterly Jira** | Jira API | Quarterly | `quarterly_summary_QX_YYYY.md` | Performance reviews, quarterly planning |
+| **Quarterly Jira** | Jira API | Quarterly | `jira_quarterly_summary_QX_YYYY.md` | Performance reviews, quarterly planning |
 | **GitHub Quarterly** | GitHub API | Quarterly | `github_quarterly_summary_QX_YYYY.md` | Code contribution analysis, developer insights |
 | **Engineer Performance** | Jira + GitHub | Quarterly | `engineer_quarterly_performance_QX_YYYY.md` | 1-on-1s, coaching, individual performance tracking |
 
@@ -128,9 +128,7 @@ from team_reports import WeeklyTeamSummary
 
 # With .env credentials
 report = WeeklyTeamSummary(config_file='config/jira_config.yaml')
-report.initialize()
-tickets = report.fetch_tickets('2025-01-01', '2025-01-07')
-summary = report.generate_summary_report(tickets, '2025-01-01', '2025-01-07')
+summary, tickets = report.generate_weekly_summary('2025-01-01', '2025-01-07')
 
 # Or with explicit credentials (no .env needed)
 report = WeeklyTeamSummary(
@@ -139,16 +137,22 @@ report = WeeklyTeamSummary(
     jira_email='user@company.com',
     jira_token='your-token'
 )
-report.initialize()
+summary, tickets = report.generate_weekly_summary('2025-01-01', '2025-01-07')
+
+# Use the report content
+print(summary)  # Formatted markdown report
+# Process ticket data if needed
+for ticket in tickets:
+    print(f"{ticket.key}: {ticket.fields.summary}")
 ```
 
 **Available Classes:**
 ```python
 from team_reports import (
-    WeeklyTeamSummary,           # Jira weekly reports
-    QuarterlyJiraSummary,         # Jira quarterly reports
-    GithubWeeklySummary,          # GitHub weekly reports
-    GithubQuarterlySummary,       # GitHub quarterly reports
+    WeeklyTeamSummary,            # Jira weekly reports
+    QuarterlyTeamSummary,         # Jira quarterly reports
+    GitHubWeeklySummary,          # GitHub weekly reports
+    GitHubQuarterlySummary,       # GitHub quarterly reports
     EngineerQuarterlyPerformance  # Engineer performance reports
 )
 ```
@@ -264,27 +268,46 @@ cp config/github_config_example.yaml config/github_config.yaml
 
 ```
 team-reports/
-├── 📊 Core Report Generators
-│   ├── jira_weekly_summary.py           # Weekly Jira reports  
-│   ├── github_weekly_summary.py         # Weekly GitHub reports
-│   ├── jira_quarterly_summary.py        # Quarterly Jira reports
-│   ├── github_quarterly_summary.py      # GitHub quarterly reports
-│   └── engineer_quarterly_performance.py # Engineer performance reports
-├── 🚀 Execution Scripts  
+├── 📦 Package (Installable)
+│   ├── team_reports/
+│   │   ├── __init__.py                  # Public API exports
+│   │   ├── cli/
+│   │   │   ├── __init__.py
+│   │   │   └── main.py                  # Click CLI implementation
+│   │   ├── reports/
+│   │   │   ├── __init__.py
+│   │   │   ├── jira_weekly.py           # Jira weekly report class
+│   │   │   ├── jira_quarterly.py        # Jira quarterly report class
+│   │   │   ├── github_weekly.py         # GitHub weekly report class
+│   │   │   ├── github_quarterly.py      # GitHub quarterly report class
+│   │   │   └── engineer_performance.py  # Engineer performance class
+│   │   └── utils/
+│   │       ├── __init__.py
+│   │       ├── jira.py                  # Jira API utilities
+│   │       ├── github.py                # GitHub API utilities
+│   │       ├── config.py                # Configuration management
+│   │       ├── date.py                  # Date utilities
+│   │       ├── ticket.py                # Ticket processing
+│   │       └── report.py                # Report generation
+│   └── pyproject.toml                   # Package metadata & dependencies
+├── 🚀 Shell Scripts (Backward Compatible)
 │   ├── run_jira_weekly_summary.sh       # Weekly Jira report runner
 │   ├── run_github_weekly_summary.sh     # Weekly GitHub report runner
-│   ├── run_batch_weekly.sh              # Batch weekly report runner (Jira + GitHub)
+│   ├── run_batch_weekly.sh              # Batch weekly report runner
 │   ├── run_jira_quarterly_summary.sh    # Quarterly Jira report runner
 │   ├── run_github_quarterly_summary.sh  # GitHub quarterly report runner
 │   └── run_engineer_quarterly_performance.sh # Engineer performance runner
 ├── ⚙️ Configuration
 │   ├── env.template                     # Environment template
-│   ├── config/jira_config_example.yaml        # Jira configuration example
-│   ├── config/github_config_example.yaml      # GitHub configuration example
-│   ├── config/jira_config.yaml               # Your Jira config (create this)
-│   ├── config/github_config.yaml             # Your GitHub config (create this)  
-│   └── .env                           # API credentials (create this)
-├── 🛠️ Utilities Package
+│   ├── config/
+│   │   ├── default_config.yaml          # Default settings
+│   │   ├── team_config_example.yaml     # Team configuration example
+│   │   ├── jira_config_example.yaml     # Jira configuration example
+│   │   ├── github_config_example.yaml   # GitHub configuration example
+│   │   ├── jira_config.yaml             # Your Jira config (create this)
+│   │   └── github_config.yaml           # Your GitHub config (create this)
+│   └── .env                             # API credentials (create this)
+├── 🛠️ Old Utilities (Deprecated - use team_reports.utils)
 │   └── utils/
 │       ├── __init__.py                 # Package initialization
 │       ├── batch.py                   # Batch processing and date utilities
@@ -299,10 +322,12 @@ team-reports/
 │       └── ticket.py                  # Ticket categorization
 ├── 📄 Documentation
 │   ├── README.md                      # This file
+│   ├── LIBRARY_USAGE.md               # Python API guide
+│   ├── MIGRATION_GUIDE.md             # Upgrade guide
+│   ├── CONFIGURATION_GUIDE.md         # Configuration reference
 │   ├── WEEKLY_SUMMARY_README.md       # Weekly reports guide
 │   ├── GITHUB_QUARTERLY_README.md     # GitHub reports guide
-│   ├── CONFIGURATION_GUIDE.md         # Configuration reference
-│   └── DEVELOPER_GUIDE.md            # Development guide
+│   └── DEVELOPER_GUIDE.md             # Development guide
 ├── 📁 Output
 │   └── Reports/                       # Generated reports (auto-created)
 │       ├── jira_weekly_summary_*.md   # Weekly Jira reports

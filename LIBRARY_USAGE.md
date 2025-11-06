@@ -21,24 +21,25 @@ from team_reports import WeeklyTeamSummary
 # Create report instance
 report = WeeklyTeamSummary(config_file='config/jira_config.yaml')
 
-# Initialize connection
-report.initialize()
+# Generate report (initializes connection and fetches data)
+summary, tickets = report.generate_weekly_summary('2025-01-01', '2025-01-07')
 
-# Fetch and generate report
-tickets = report.fetch_tickets('2025-01-01', '2025-01-07')
-summary = report.generate_summary_report(tickets, '2025-01-01', '2025-01-07')
+# Use the report
+print(summary)  # Formatted markdown report
 
-print(summary)
+# Access ticket data if needed
+for ticket in tickets:
+    print(f"{ticket.key}: {ticket.fields.summary}")
 ```
 
 ## Available Report Classes
 
 ```python
 from team_reports import (
-    WeeklyTeamSummary,           # Jira weekly reports
-    QuarterlyJiraSummary,         # Jira quarterly reports
-    GithubWeeklySummary,          # GitHub weekly reports
-    GithubQuarterlySummary,       # GitHub quarterly reports
+    WeeklyTeamSummary,            # Jira weekly reports
+    QuarterlyTeamSummary,         # Jira quarterly reports
+    GitHubWeeklySummary,          # GitHub weekly reports
+    GitHubQuarterlySummary,       # GitHub quarterly reports
     EngineerQuarterlyPerformance  # Engineer performance reports
 )
 ```
@@ -95,57 +96,66 @@ This allows flexible deployment across different environments.
 ```python
 from team_reports import WeeklyTeamSummary
 
-# Basic usage
+# Basic usage - returns (summary_text, tickets_list)
 report = WeeklyTeamSummary(config_file='config/jira_config.yaml')
-report.initialize()
+summary, tickets = report.generate_weekly_summary('2025-01-01', '2025-01-07')
 
-# Fetch tickets for date range
-tickets = report.fetch_tickets('2025-01-01', '2025-01-07')
+# Use the report
+print(summary)  # Formatted markdown
 
-# Generate formatted report
-summary = report.generate_summary_report(tickets, '2025-01-01', '2025-01-07')
-
-# Report is automatically saved to Reports/ directory
-print(summary)
+# Access raw ticket data
+print(f"Found {len(tickets)} tickets")
+for ticket in tickets:
+    print(f"{ticket.key}: {ticket.fields.summary}")
 ```
 
 ### 2. Jira Quarterly Reports
 
 ```python
-from team_reports import QuarterlyJiraSummary
+from team_reports import QuarterlyTeamSummary
 
-report = QuarterlyJiraSummary(config_file='config/jira_config.yaml')
-report.initialize()
+# Generate quarterly report - returns (summary_text, tickets_list)
+report = QuarterlyTeamSummary(config_file='config/jira_config.yaml')
+summary, tickets = report.generate_quarterly_summary(year=2025, quarter=4)
 
-# Generate quarterly report (returns report string)
-summary = report.generate_quarterly_summary(year=2025, quarter=4)
+# Use the report
+print(summary)
+print(f"Analyzed {len(tickets)} tickets for Q4 2025")
 ```
 
 ### 3. GitHub Weekly Reports
 
 ```python
-from team_reports import GithubWeeklySummary
+from team_reports import GitHubWeeklySummary
 
-report = GithubWeeklySummary(
+# Generate report - returns (summary_text, raw_data_dict)
+report = GitHubWeeklySummary(
     config_file='config/github_config.yaml',
     github_token='optional-token'  # Or use .env
 )
 
-# Returns tuple: (summary_text, raw_data_dict)
-summary, data = report.generate_report('2025-01-01', '2025-01-07', config_file='config/github_config.yaml')
+summary, data = report.generate_report('2025-01-01', '2025-01-07', 'config/github_config.yaml')
+
+# Access raw data
+for pr in data['pull_requests']:
+    print(f"PR #{pr['number']}: {pr['title']}")
 ```
 
 ### 4. GitHub Quarterly Reports
 
 ```python
-from team_reports import GithubQuarterlySummary
+from team_reports import GitHubQuarterlySummary
 
-report = GithubQuarterlySummary(
+# Generate quarterly report - returns (summary_text, raw_data_dict)
+report = GitHubQuarterlySummary(
     config_file='config/github_config.yaml'
 )
 
-# Returns tuple: (summary_text, raw_data_dict)
 summary, data = report.generate_quarterly_summary(year=2025, quarter=4)
+
+# Use the report and data
+print(summary)
+print(f"Total pull requests: {len(data)}")
 ```
 
 ### 5. Engineer Performance Reports
@@ -183,10 +193,10 @@ frontend_report = WeeklyTeamSummary(config_file='config/frontend_team.yaml')
 Some reports return both formatted text and raw data:
 
 ```python
-from team_reports import GithubWeeklySummary
+from team_reports import GitHubWeeklySummary
 
-report = GithubWeeklySummary(config_file='config/github_config.yaml')
-summary_text, raw_data = report.generate_report('2025-01-01', '2025-01-07', config_file='config/github_config.yaml')
+report = GitHubWeeklySummary(config_file='config/github_config.yaml')
+summary_text, raw_data = report.generate_report('2025-01-01', '2025-01-07', 'config/github_config.yaml')
 
 # Access raw data
 pull_requests = raw_data['pull_requests']
@@ -213,10 +223,8 @@ def post_weekly_report_to_slack():
         jira_email=os.environ['JIRA_EMAIL'],
         jira_token=os.environ['JIRA_TOKEN']
     )
-    report.initialize()
     
-    tickets = report.fetch_tickets('2025-01-01', '2025-01-07')
-    summary = report.generate_summary_report(tickets, '2025-01-01', '2025-01-07')
+    summary, tickets = report.generate_weekly_summary('2025-01-01', '2025-01-07')
     
     # Post to Slack
     client = WebClient(token=os.environ['SLACK_TOKEN'])
@@ -233,10 +241,10 @@ post_weekly_report_to_slack()
 
 ```python
 # in your CI/CD script
-from team_reports import QuarterlyJiraSummary
+from team_reports import QuarterlyTeamSummary
 
 def generate_quarterly_artifacts():
-    report = QuarterlyJiraSummary(
+    report = QuarterlyTeamSummary(
         config_file='config/jira_config.yaml',
         jira_server=os.environ['JIRA_SERVER'],
         jira_email=os.environ['JIRA_EMAIL'],

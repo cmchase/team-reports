@@ -76,9 +76,7 @@ from team_reports import WeeklyTeamSummary
 
 # With .env credentials
 report = WeeklyTeamSummary(config_file='config/jira_config.yaml')
-report.initialize()
-tickets = report.fetch_tickets('2025-01-01', '2025-01-07')
-summary = report.generate_summary_report(tickets, '2025-01-01', '2025-01-07')
+summary, tickets = report.generate_weekly_summary('2025-01-01', '2025-01-07')
 
 # Or with explicit credentials (no .env needed)
 report = WeeklyTeamSummary(
@@ -87,8 +85,7 @@ report = WeeklyTeamSummary(
     jira_email='user@company.com',
     jira_token='your-token'
 )
-report.initialize()
-# ... same as above
+summary, tickets = report.generate_weekly_summary('2025-01-01', '2025-01-07')
 ```
 
 ## What You Don't Need to Change
