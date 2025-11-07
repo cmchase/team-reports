@@ -9,16 +9,16 @@ GitHub repositories.
 __version__ = "1.0.0"
 
 # Import report classes for public API
-from team_reports.reports.jira_weekly import WeeklyTeamSummary
+from team_reports.reports.jira_weekly import WeeklyJiraSummary
 from team_reports.reports.jira_quarterly import QuarterlyTeamSummary
-from team_reports.reports.github_weekly import GitHubWeeklySummary
+from team_reports.reports.github_weekly import WeeklyGitHubSummary
 from team_reports.reports.github_quarterly import GitHubQuarterlySummary
 from team_reports.reports.engineer_performance import EngineerQuarterlyPerformance
 
 __all__ = [
-    'WeeklyTeamSummary',
+    'WeeklyJiraSummary',
     'QuarterlyTeamSummary',
-    'GitHubWeeklySummary',
+    'WeeklyGitHubSummary',
     'GitHubQuarterlySummary',
     'EngineerQuarterlyPerformance',
     '__version__',

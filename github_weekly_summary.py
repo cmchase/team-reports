@@ -32,9 +32,9 @@ from utils.github_summary_base import GitHubSummaryBase
 load_dotenv()
 
 
-class GitHubWeeklySummary(GitHubSummaryBase):
+class WeeklyGitHubSummary(GitHubSummaryBase):
     def __init__(self, config_file='config/github_config.yaml'):
-        """Initialize the GitHub weekly summary generator with configuration."""
+        """Initialize the weekly GitHub summary generator with configuration."""
         super().__init__(config_file)
 
     def generate_report(self, start_date: str, end_date: str, config_file: str = 'config/github_config.yaml') -> Tuple[str, Dict[str, List[Dict]]]:
@@ -91,7 +91,7 @@ def main():
         print(f"⚙️  Using config: {config_file}")
         
         # Initialize the weekly summary generator
-        weekly_summary = GitHubWeeklySummary(config_file)
+        weekly_summary = WeeklyGitHubSummary(config_file)
         
         # Generate the report and get PR data for potential lead time analysis
         report, pr_data = weekly_summary.generate_report(start_date, end_date, config_file)

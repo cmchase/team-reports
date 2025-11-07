@@ -33,7 +33,7 @@ from team_reports.utils.jira_summary_base import JiraSummaryBase
 # Load environment variables
 load_dotenv()
 
-class WeeklyTeamSummary(JiraSummaryBase):
+class WeeklyJiraSummary(JiraSummaryBase):
     def __init__(
         self,
         config_file='config/jira_config.yaml',
@@ -42,7 +42,7 @@ class WeeklyTeamSummary(JiraSummaryBase):
         jira_token=None
     ):
         """
-        Initialize the weekly team summary generator with configuration.
+        Initialize the weekly Jira summary generator with configuration.
         
         Args:
             config_file: Path to YAML configuration file

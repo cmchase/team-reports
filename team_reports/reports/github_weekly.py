@@ -29,14 +29,14 @@ from team_reports.utils.github_summary_base import GitHubSummaryBase
 load_dotenv()
 
 
-class GitHubWeeklySummary(GitHubSummaryBase):
+class WeeklyGitHubSummary(GitHubSummaryBase):
     def __init__(
         self,
         config_file='config/github_config.yaml',
         github_token=None
     ):
         """
-        Initialize the GitHub weekly summary generator with configuration.
+        Initialize the weekly GitHub summary generator with configuration.
         
         Args:
             config_file: Path to YAML configuration file

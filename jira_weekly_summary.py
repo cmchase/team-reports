@@ -36,9 +36,9 @@ from utils.jira_summary_base import JiraSummaryBase
 # Load environment variables
 load_dotenv()
 
-class WeeklyTeamSummary(JiraSummaryBase):
+class WeeklyJiraSummary(JiraSummaryBase):
     def __init__(self, config_file='config/jira_config.yaml'):
-        """Initialize the weekly team summary generator with configuration."""
+        """Initialize the weekly Jira summary generator with configuration."""
         super().__init__(config_file)
         
     # All common methods now inherited from JiraSummaryBase:
@@ -353,7 +353,7 @@ def main():
         enable_wip = flag("metrics.flow.wip") 
         enable_blocked_time = flag("metrics.flow.blocked_time")
         
-        summary_generator = WeeklyTeamSummary(config_file)
+        summary_generator = WeeklyJiraSummary(config_file)
         report, tickets = summary_generator.generate_weekly_summary(start_date, end_date)
         
         # Pre-fetch specialized data for flow analyses (optimized approach)

@@ -14,9 +14,9 @@ from typing import Optional
 from dotenv import load_dotenv
 load_dotenv()
 
-from team_reports.reports.jira_weekly import WeeklyTeamSummary
+from team_reports.reports.jira_weekly import WeeklyJiraSummary
 from team_reports.reports.jira_quarterly import QuarterlyTeamSummary
-from team_reports.reports.github_weekly import GitHubWeeklySummary
+from team_reports.reports.github_weekly import WeeklyGitHubSummary
 from team_reports.reports.github_quarterly import GitHubQuarterlySummary
 from team_reports.reports.engineer_performance import EngineerQuarterlyPerformance
 from team_reports.utils.date import get_current_week, get_current_quarter, parse_date_args
@@ -79,7 +79,7 @@ def jira_weekly(start_date: Optional[str], end_date: Optional[str], config: str,
         click.echo(f"Generating Jira weekly report: {start} to {end}")
         
         # Create report instance with credentials
-        report = WeeklyTeamSummary(
+        report = WeeklyJiraSummary(
             config_file=config,
             jira_server=jira_server,
             jira_email=jira_email,
@@ -182,7 +182,7 @@ def github_weekly(start_date: Optional[str], end_date: Optional[str], config: st
         click.echo(f"Generating GitHub weekly report: {start} to {end}")
         
         # Create report instance with credentials
-        report = GitHubWeeklySummary(
+        report = WeeklyGitHubSummary(
             config_file=config,
             github_token=github_token
         )
