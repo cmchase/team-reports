@@ -62,19 +62,25 @@ def jira_weekly(start_date: Optional[str], end_date: Optional[str], config: str,
                 jira_server: Optional[str], jira_email: Optional[str], jira_token: Optional[str]):
     """Generate weekly Jira report.
     
-    If no dates provided, uses current week.
+    Date handling:
+    - No dates: uses current week
+    - Single date: uses as start date, calculates end date (+6 days)
+    - Both dates: uses exact date range
     
     Examples:
         team-reports jira weekly
+        team-reports jira weekly 2025-10-21
         team-reports jira weekly 2025-01-01 2025-01-07
         team-reports jira weekly --config custom.yaml
     """
     try:
-        # Parse dates or use current week
-        if start_date and end_date:
-            start, end = start_date, end_date
-        else:
-            start, end = get_current_week()
+        # Parse dates - handles 0, 1, or 2 date arguments
+        args = []
+        if start_date:
+            args.append(start_date)
+        if end_date:
+            args.append(end_date)
+        start, end = parse_date_args(args)
         
         click.echo(f"Generating Jira weekly report: {start} to {end}")
         
@@ -165,19 +171,25 @@ def github_weekly(start_date: Optional[str], end_date: Optional[str], config: st
                   github_token: Optional[str]):
     """Generate weekly GitHub report.
     
-    If no dates provided, uses current week.
+    Date handling:
+    - No dates: uses current week
+    - Single date: uses as start date, calculates end date (+6 days)
+    - Both dates: uses exact date range
     
     Examples:
         team-reports github weekly
+        team-reports github weekly 2025-10-21
         team-reports github weekly 2025-01-01 2025-01-07
         team-reports github weekly --github-token YOUR_TOKEN
     """
     try:
-        # Parse dates or use current week
-        if start_date and end_date:
-            start, end = start_date, end_date
-        else:
-            start, end = get_current_week()
+        # Parse dates - handles 0, 1, or 2 date arguments
+        args = []
+        if start_date:
+            args.append(start_date)
+        if end_date:
+            args.append(end_date)
+        start, end = parse_date_args(args)
         
         click.echo(f"Generating GitHub weekly report: {start} to {end}")
         
