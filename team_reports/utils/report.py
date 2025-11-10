@@ -14,6 +14,31 @@ from typing import Dict, List, Any, Optional
 from collections import defaultdict
 
 
+def truncate_text(text: str, max_length: int = 500) -> str:
+    """
+    Truncate text to specified length, adding ellipsis if truncated.
+    Handles None values and strips whitespace.
+    
+    Args:
+        text: Text to truncate
+        max_length: Maximum length before truncation
+        
+    Returns:
+        Truncated text with "..." if needed
+        
+    Note:
+        No additional API calls required - this is pure text processing.
+    """
+    if not text:
+        return ""
+    
+    text = text.strip()
+    if len(text) <= max_length:
+        return text
+    
+    return text[:max_length].rstrip() + "..."
+
+
 def format_table_row(ticket_info: Dict[str, str], assignee_width: int = 20) -> str:
     """
     Format a single ticket as a markdown table row.
@@ -32,7 +57,8 @@ def format_table_row(ticket_info: Dict[str, str], assignee_width: int = 20) -> s
             'summary': 'Ticket title',
             'assignee': 'John Doe',
             'priority': 'High',
-            'updated': '2025-01-15'
+            'updated': '2025-01-15',
+            'description': 'Ticket description (truncated)'
         }
     """
     # Create markdown link for ticket ID
@@ -45,7 +71,10 @@ def format_table_row(ticket_info: Dict[str, str], assignee_width: int = 20) -> s
     if len(assignee) > assignee_width:
         assignee = assignee[:assignee_width-3] + "..."
     
-    return f"| {ticket_link:<25} | {assignee:<{assignee_width}} | {ticket_info['priority']:<8} | {ticket_info['updated']:<10} | {title} |"
+    # Get description (may be empty string)
+    description = ticket_info.get('description', '')
+    
+    return f"| {ticket_link:<25} | {assignee:<{assignee_width}} | {ticket_info['priority']:<8} | {ticket_info['updated']:<10} | {title} | {description} |"
 
 
 def create_table_header() -> List[str]:
@@ -53,11 +82,11 @@ def create_table_header() -> List[str]:
     Create standard markdown table header for ticket tables.
     
     Returns:
-        List[str]: Table header lines
+        List[str]: Table header lines including Description column
     """
     return [
-        "| Ticket ID                | Assignee             | Priority | Updated    | Title |",
-        "|--------------------------|----------------------|----------|------------|-------|"
+        "| Ticket ID                | Assignee             | Priority | Updated    | Title | Description |",
+        "|--------------------------|----------------------|----------|------------|-------|-------------|"
     ]
 
 

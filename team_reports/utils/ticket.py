@@ -161,6 +161,10 @@ def format_ticket_info(issue, jira_server_url: str, config: Optional[Dict[str, A
         - components: List of component names
         - updated: Completion date (resolutiondate preferred, fallback to updated date) in YYYY-MM-DD format
         - url: Direct link to the ticket
+        - description: Ticket description truncated to 500 characters
+        
+    Note:
+        No additional API calls required - description is already fetched with ticket data.
     """
     # Get assignee email first
     assignee_email = issue.fields.assignee.emailAddress if issue.fields.assignee else None
@@ -176,6 +180,12 @@ def format_ticket_info(issue, jira_server_url: str, config: Optional[Dict[str, A
         # Fallback to JIRA display name or email
         assignee_display = issue.fields.assignee.displayName if issue.fields.assignee else 'Unassigned'
     
+    # Import truncate_text utility
+    from team_reports.utils.report import truncate_text
+    
+    # Get and truncate description (handles None values)
+    description = getattr(issue.fields, 'description', None) or ''
+    
     return {
         'key': issue.key,
         'summary': issue.fields.summary,
@@ -186,7 +196,8 @@ def format_ticket_info(issue, jira_server_url: str, config: Optional[Dict[str, A
         'story_points': int(getattr(issue.fields, 'customfield_12310243', None) or getattr(issue.fields, 'storypoints', None) or 0),
         'components': [comp.name for comp in getattr(issue.fields, 'components', [])],
         'updated': get_completion_date(issue) or str(issue.fields.updated)[:10],  # Use completion date (resolutiondate preferred)
-        'url': f"{jira_server_url}/browse/{issue.key}"
+        'url': f"{jira_server_url}/browse/{issue.key}",
+        'description': truncate_text(description, max_length=500)
     }
 
 

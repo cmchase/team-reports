@@ -12,6 +12,7 @@ from datetime import datetime
 
 from .github_client import GitHubApiClient
 from .github import generate_pr_lead_time_analysis, is_bot_user
+from .report import truncate_text
 
 
 class GitHubSummaryBase:
@@ -284,8 +285,8 @@ class GitHubSummaryBase:
                 recent_prs = sorted(prs, key=lambda x: x['updated_at'], reverse=True)[:10]
             
             section.extend([
-                "| Repository | PR | State | Lines | Comments | Title |",
-                "|------------|-------|-------|--------|----------|-------|"
+                "| Repository | PR | State | Lines | Comments | Title | Description |",
+                "|------------|-------|-------|--------|----------|-------|-------------|"
             ])
             
             for pr in recent_prs:
@@ -294,15 +295,19 @@ class GitHubSummaryBase:
                 # Calculate comment count (excluding bots)
                 comment_count = self._get_pr_comment_count(pr)
                 
+                # Get and truncate PR description (body field)
+                # Note: No additional API calls required - body is already in PR data
+                description = truncate_text(pr.get('body', ''), max_length=500)
+                
                 if report_type == "quarterly":
                     state_emoji = "✅" if pr['state'] == 'closed' and pr['merged_at'] else "❌" if pr['state'] == 'closed' else "🔄"
                     additions = pr.get('additions', 0)
                     deletions = pr.get('deletions', 0)
                     lines_change = f"+{additions}/-{deletions}" if additions > 0 or deletions > 0 else "No data"
-                    section.append(f"| {pr['repo']} | [#{pr['number']}]({pr['url']}) | {state_emoji} {pr['state']} | {lines_change} | {comment_count} | {title} |")
+                    section.append(f"| {pr['repo']} | [#{pr['number']}]({pr['url']}) | {state_emoji} {pr['state']} | {lines_change} | {comment_count} | {title} | {description} |")
                 else:
                     lines = f"+{pr.get('additions', 0)}/-{pr.get('deletions', 0)}"
-                    section.append(f"| {pr['repo']} | [#{pr['number']}]({pr['url']}) | {pr['state']} | {lines} | {comment_count} | {title} |")
+                    section.append(f"| {pr['repo']} | [#{pr['number']}]({pr['url']}) | {pr['state']} | {lines} | {comment_count} | {title} | {description} |")
             section.append("")
 
         # Recent Commits (show top 3)
