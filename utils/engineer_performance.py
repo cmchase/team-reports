@@ -299,7 +299,8 @@ def _distribute_github_data_by_week(github_data: Dict[str, Any],
     # Process commits by commit date
     for repo, commits in github_data.get('commits', {}).items():
         for commit in commits:
-            author = commit.get('author', {}).get('login')
+            author_data = commit.get('author') or {}
+            author = author_data.get('login')
             if not author:
                 continue
                 
