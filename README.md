@@ -192,8 +192,9 @@ GITHUB_TOKEN=your-github-personal-access-token
 ```
 
 **Getting API Tokens:**
-- **Jira**: Account Settings → Security → API tokens → Create token
-- **GitHub**: Settings → Developer settings → Personal access tokens → Generate new token
+- **Jira (Atlassian Cloud)**: Account Settings → Security → API tokens → Create token
+- **Jira (Server/Data Center)**: Profile → Personal Access Tokens → Create token
+- **GitHub**: Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token
   - Required scopes: `repo` (for private repos) or `public_repo` (for public repos)
 
 ### 3. Configure Report Settings

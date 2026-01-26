@@ -86,6 +86,7 @@ config/frontend_team.yaml
 config/security_team.yaml
 config/devops_team.yaml
 config/github_config.yaml
+config/team_config.yaml
 
 # Temporary and test configuration files
 config/temp_config.yaml

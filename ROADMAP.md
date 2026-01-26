@@ -179,6 +179,11 @@ Derived indicators to support performance coaching and 1:1 conversations:
 
 ## 💡 Phase 6 — Stretch Goals (Exploratory)
 
+* **GitLab Integration**
+
+  * Add support for GitLab repositories alongside GitHub (including self-hosted GitLab instances).
+  * Mirror existing GitHub metrics: PR lead time, review depth, contributor activity.
+  * Support GitLab-specific features like merge requests, pipelines, and issue tracking.
 * **Jira↔GitHub Auto-Linking**
 
   * Match PRs and commits to Jira tickets by key in branch names, titles, or commit messages.
