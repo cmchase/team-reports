@@ -582,6 +582,32 @@ def generate_github_team_members(team_config: Dict[str, Any]) -> Dict[str, str]:
     return github_mapping
 
 
+def generate_gitlab_team_members(team_config: Dict[str, Any]) -> Dict[str, str]:
+    """
+    Generate GitLab team_members mapping from consolidated team config.
+    
+    Args:
+        team_config: Team configuration from team_config.yaml
+        
+    Returns:
+        Dict mapping gitlab_username -> display_name
+        
+    Example:
+        {"csmith": "Chad Smith"}
+    """
+    team_members = team_config.get('team_members', {})
+    gitlab_mapping = {}
+    
+    for person_id, person_data in team_members.items():
+        gitlab_username = person_data.get('gitlab_username')
+        display_name = person_data.get('display_name')
+        
+        if gitlab_username and display_name:
+            gitlab_mapping[gitlab_username] = display_name
+            
+    return gitlab_mapping
+
+
 def generate_user_mapping(team_config: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
     """
     Generate user_mapping for cross-system identity resolution.
@@ -590,22 +616,27 @@ def generate_user_mapping(team_config: Dict[str, Any]) -> Dict[str, Dict[str, st
         team_config: Team configuration from team_config.yaml
         
     Returns:
-        Dict with github_to_jira mapping
+        Dict with github_to_jira and gitlab_to_jira mappings
         
     Example:
-        {"github_to_jira": {"infinitewarp": "brasmith@redhat.com"}}
+        {"github_to_jira": {"infinitewarp": "brasmith@redhat.com"},
+         "gitlab_to_jira": {"csmith": "brasmith@redhat.com"}}
     """
     team_members = team_config.get('team_members', {})
     github_to_jira = {}
+    gitlab_to_jira = {}
     
     for person_id, person_data in team_members.items():
         github_username = person_data.get('github_username')
+        gitlab_username = person_data.get('gitlab_username')
         jira_email = person_data.get('jira_email')
         
         if github_username and jira_email:
             github_to_jira[github_username] = jira_email
+        if gitlab_username and jira_email:
+            gitlab_to_jira[gitlab_username] = jira_email
             
-    return {"github_to_jira": github_to_jira}
+    return {"github_to_jira": github_to_jira, "gitlab_to_jira": gitlab_to_jira}
 
 
 def load_user_configs(paths: Optional[List[str]] = None) -> Dict[str, Any]:
@@ -628,7 +659,7 @@ def load_user_configs(paths: Optional[List[str]] = None) -> Dict[str, Any]:
         repo_root = Path(__file__).parent.parent
         paths = []
         
-        for config_name in ['jira_config.yaml', 'github_config.yaml']:
+        for config_name in ['jira_config.yaml', 'github_config.yaml', 'gitlab_config.yaml']:
             config_path = repo_root / 'config' / config_name
             if config_path.exists():
                 paths.append(str(config_path))
@@ -795,10 +826,13 @@ def get_config(paths: Optional[List[str]] = None) -> Dict[str, Any]:
             # Generate mappings from consolidated team data
             jira_team_members = generate_jira_team_members(team_config)
             github_team_members = generate_github_team_members(team_config)
+            gitlab_team_members = generate_gitlab_team_members(team_config)
             user_mapping = generate_user_mapping(team_config)
             
             # Merge generated mappings (prioritizing team_config)
             config['team_members'].update(jira_team_members)
+            config['team_members'].update(github_team_members)
+            config['team_members'].update(gitlab_team_members)
             config['user_mapping'].update(user_mapping)
             
             print("✅ Merged team configuration")

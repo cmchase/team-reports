@@ -21,6 +21,7 @@ from collections import defaultdict, Counter
 
 from .date import get_quarter_range
 from .github_client import GitHubApiClient
+from .gitlab_client import GitLabApiClient
 from .jira_client import JiraApiClient
 
 
@@ -87,11 +88,11 @@ def _is_bot_user(user_id: str, config: Dict[str, Any]) -> bool:
 
 def _normalize_user_id(user_id: str, source_system: str, config: Dict[str, Any]) -> Optional[str]:
     """
-    Normalize user identifiers across GitHub and Jira systems with bot filtering.
+    Normalize user identifiers across GitHub, GitLab, and Jira systems with bot filtering.
     
     Args:
-        user_id: The user identifier (GitHub username or Jira email)
-        source_system: "github" or "jira"
+        user_id: The user identifier (GitHub username, GitLab username, or Jira email)
+        source_system: "github", "gitlab", or "jira"
         config: Configuration containing user_mapping and bot patterns
         
     Returns:
@@ -106,11 +107,18 @@ def _normalize_user_id(user_id: str, source_system: str, config: Dict[str, Any])
     
     user_mapping = config.get('user_mapping', {})
     github_to_jira = user_mapping.get('github_to_jira', {})
+    gitlab_to_jira = user_mapping.get('gitlab_to_jira', {})
     
     if source_system == "github":
         # Map GitHub username to Jira email if mapping exists
         mapped_id = github_to_jira.get(user_id, user_id)
         # Double-check the mapped ID isn't a bot either
+        if _is_bot_user(mapped_id, config):
+            return None
+        return mapped_id
+    elif source_system == "gitlab":
+        # Map GitLab username to Jira email if mapping exists
+        mapped_id = gitlab_to_jira.get(user_id, user_id)
         if _is_bot_user(mapped_id, config):
             return None
         return mapped_id
@@ -122,14 +130,16 @@ def _normalize_user_id(user_id: str, source_system: str, config: Dict[str, Any])
 
 
 def collect_weekly_engineer_data(
-    year: int, 
-    quarter: int, 
+    year: int,
+    quarter: int,
     jira_config_file: str,
     github_config_file: str = None,
+    gitlab_config_file: str = None,
     jira_server: str = None,
     jira_email: str = None,
     jira_token: str = None,
-    github_token: str = None
+    github_token: str = None,
+    gitlab_token: str = None,
 ) -> Dict[str, Dict[str, Any]]:
     """
     Collect weekly engineer performance data for an entire quarter.
@@ -139,18 +149,19 @@ def collect_weekly_engineer_data(
         quarter: Quarter number (1-4)
         jira_config_file: Path to Jira configuration file
         github_config_file: Path to GitHub configuration file (optional)
+        gitlab_config_file: Path to GitLab configuration file (optional)
         jira_server: Optional Jira server URL (overrides environment)
         jira_email: Optional Jira email (overrides environment)
         jira_token: Optional Jira API token (overrides environment)
         github_token: Optional GitHub API token (overrides environment)
+        gitlab_token: Optional GitLab API token (overrides environment)
         
     Returns:
         Dictionary mapping engineer names to their weekly performance data:
         {
             "john.doe": {
                 "weeks": {
-                    "2025-04-07": {"github": {...}, "jira": {...}},
-                    "2025-04-14": {"github": {...}, "jira": {...}},
+                    "2025-04-07": {"github": {...}, "jira": {...}, "gitlab": {...}},
                     ...
                 },
                 "display_name": "John Doe",
@@ -178,6 +189,18 @@ def collect_weekly_engineer_data(
     except Exception as e:
         print(f"⚠️  Warning: Could not load GitHub config ({e}). GitHub metrics will be empty.")
         github_client = None
+
+    if gitlab_config_file is None:
+        gitlab_config_file = "config/gitlab_config.yaml"
+    try:
+        gitlab_client = GitLabApiClient(
+            config_file=gitlab_config_file,
+            gitlab_token=gitlab_token
+        )
+        print(f"✅ Loaded GitLab config with {len(gitlab_client.projects)} projects")
+    except Exception as e:
+        print(f"⚠️  Warning: Could not load GitLab config ({e}). GitLab metrics will be empty.")
+        gitlab_client = None
     
     jira_client = JiraApiClient(
         config_file=jira_config_file,
@@ -198,7 +221,13 @@ def collect_weekly_engineer_data(
         print("📊 Fetching GitHub data for entire quarter...")
         github_data = github_client.fetch_all_data(start_date, end_date)
     else:
-        github_data = {'pull_requests': {}, 'commits': {}}
+        github_data = {"pull_requests": {}, "commits": {}}
+
+    if gitlab_client:
+        print("📊 Fetching GitLab data for entire quarter...")
+        gitlab_data = gitlab_client.fetch_all_data(start_date, end_date)
+    else:
+        gitlab_data = {"pull_requests": {}, "commits": {}}
     
     print("🎫 Fetching Jira data for entire quarter...")
     jira_tickets = jira_client.fetch_tickets(start_date, end_date)
@@ -212,21 +241,30 @@ def collect_weekly_engineer_data(
     # Process GitHub data by week
     github_weekly_data = _distribute_github_data_by_week(github_data, weekly_ranges, jira_config)
     
+    # Process GitLab data by week
+    gitlab_weekly_data = _distribute_gitlab_data_by_week(gitlab_data, weekly_ranges, jira_config)
+    
     # Process Jira data by week  
     jira_weekly_data = _distribute_jira_data_by_week(jira_tickets, weekly_ranges, jira_config)
     
     # Merge weekly data
-    all_engineers = set(github_weekly_data.keys()) | set(jira_weekly_data.keys())
+    all_engineers = (
+        set(github_weekly_data.keys())
+        | set(jira_weekly_data.keys())
+        | set(gitlab_weekly_data.keys())
+    )
     
     for engineer in all_engineers:
         engineer_github_weeks = github_weekly_data.get(engineer, {})
         engineer_jira_weeks = jira_weekly_data.get(engineer, {})
+        engineer_gitlab_weeks = gitlab_weekly_data.get(engineer, {})
         
         # Merge weekly data for this engineer
         for week_start, _ in weekly_ranges:
             engineer_data[engineer]["weeks"][week_start] = {
                 "github": engineer_github_weeks.get(week_start, _empty_github_metrics()),
-                "jira": engineer_jira_weeks.get(week_start, _empty_jira_metrics())
+                "jira": engineer_jira_weeks.get(week_start, _empty_jira_metrics()),
+                "gitlab": engineer_gitlab_weeks.get(week_start, _empty_github_metrics()),
             }
         
         # Set display name from team members config
@@ -348,6 +386,75 @@ def _distribute_github_data_by_week(github_data: Dict[str, Any],
                 engineer_weekly_data[normalized_author][week_key]['commits'] += 1
     
     # Convert defaultdicts to regular dicts
+    return {engineer: dict(weeks) for engineer, weeks in engineer_weekly_data.items()}
+
+
+def _distribute_gitlab_data_by_week(
+    gitlab_data: Dict[str, Any],
+    weekly_ranges: List[Tuple[str, str]],
+    config: Dict[str, Any],
+) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    """
+    Distribute GitLab MR/commit data into weekly buckets by engineer.
+    Uses same metrics shape as GitHub (prs_merged, commits, etc.) for unified reporting.
+    """
+    from datetime import datetime
+
+    engineer_weekly_data = defaultdict(lambda: defaultdict(lambda: _empty_github_metrics()))
+
+    for project, mrs in gitlab_data.get("pull_requests", {}).items():
+        for mr in mrs:
+            author = (mr.get("user") or {}).get("login", "unknown")
+            if author == "unknown":
+                continue
+            normalized_author = _normalize_user_id(author, "gitlab", config)
+            if not normalized_author:
+                continue
+            merged_at = mr.get("merged_at")
+            if not merged_at:
+                continue
+            merged_date = datetime.fromisoformat(merged_at.replace("Z", "+00:00"))
+            merged_date_str = merged_date.strftime("%Y-%m-%d")
+            week_key = None
+            for week_start, week_end in weekly_ranges:
+                if week_start <= merged_date_str <= week_end:
+                    week_key = week_start
+                    break
+            if week_key:
+                metrics = engineer_weekly_data[normalized_author][week_key]
+                metrics["prs_created"] += 1
+                metrics["prs_merged"] += 1
+                metrics["lines_added"] += mr.get("additions", 0)
+                metrics["lines_deleted"] += mr.get("deletions", 0)
+
+    for project, commits in gitlab_data.get("commits", {}).items():
+        for commit in commits:
+            author = (commit.get("author") or {}).get("login")
+            if not author:
+                author = (commit.get("commit") or {}).get("author") or {}
+                author = author.get("name") if isinstance(author, dict) else None
+            if not author:
+                continue
+            normalized_author = _normalize_user_id(author, "gitlab", config)
+            if not normalized_author:
+                continue
+            commit_date = (commit.get("commit") or {}).get("author") or {}
+            if isinstance(commit_date, dict):
+                date_str = commit_date.get("date") or commit.get("created_at")
+            else:
+                date_str = commit.get("created_at")
+            if not date_str:
+                continue
+            commit_datetime = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+            commit_date_str = commit_datetime.strftime("%Y-%m-%d")
+            week_key = None
+            for week_start, week_end in weekly_ranges:
+                if week_start <= commit_date_str <= week_end:
+                    week_key = week_start
+                    break
+            if week_key:
+                engineer_weekly_data[normalized_author][week_key]["commits"] += 1
+
     return {engineer: dict(weeks) for engineer, weeks in engineer_weekly_data.items()}
 
 
@@ -701,14 +808,23 @@ def compute_engineer_trends(engineer_data: Dict[str, Dict[str, Any]]) -> Dict[st
         
         for week_date in sorted_weeks:
             week_data = weeks[week_date]
-            github = week_data['github']
-            jira = week_data['jira']
-            
-            metrics_series['prs_merged'].append(github['prs_merged'])
-            metrics_series['commits'].append(github['commits'])
-            metrics_series['tickets_completed'].append(jira['tickets_completed'])
-            metrics_series['reviews_given'].append(github['reviews_given'])
-            metrics_series['lines_changed'].append(github['lines_added'] + github['lines_deleted'])
+            github = week_data["github"]
+            jira = week_data["jira"]
+            gitlab = week_data.get("gitlab", _empty_github_metrics())
+            metrics_series["prs_merged"].append(
+                github["prs_merged"] + gitlab.get("prs_merged", 0)
+            )
+            metrics_series["commits"].append(
+                github["commits"] + gitlab.get("commits", 0)
+            )
+            metrics_series["tickets_completed"].append(jira["tickets_completed"])
+            metrics_series["reviews_given"].append(github["reviews_given"])
+            metrics_series["lines_changed"].append(
+                github["lines_added"]
+                + github["lines_deleted"]
+                + gitlab.get("lines_added", 0)
+                + gitlab.get("lines_deleted", 0)
+            )
         
         # Calculate trends
         engineer_trends = {
@@ -833,7 +949,10 @@ def generate_coaching_insights(engineer_data: Dict[str, Dict[str, Any]],
         
         # Activity pattern insights
         active_weeks = sum(1 for week in data['weeks'].values() 
-                          if week['github']['prs_merged'] + week['jira']['tickets_completed'] > 0)
+                          if week["github"]["prs_merged"]
+                          + week.get("gitlab", _empty_github_metrics()).get("prs_merged", 0)
+                          + week["jira"]["tickets_completed"]
+                          > 0)
         total_weeks = data['total_weeks']
         
         if active_weeks < total_weeks * 0.7:  # Less than 70% active weeks
@@ -879,12 +998,18 @@ def format_weekly_metrics_table(engineer: str, data: Dict[str, Any], trends: Dic
         
         for week_date in sorted_weeks:
             week_data = weeks[week_date]
-            
-            if metric_name == 'Lines Changed':
-                value = week_data['github']['lines_added'] + week_data['github']['lines_deleted']
+            gitlab = week_data.get("gitlab", _empty_github_metrics())
+            if metric_name == "Lines Changed":
+                value = (
+                    week_data["github"]["lines_added"]
+                    + week_data["github"]["lines_deleted"]
+                    + gitlab.get("lines_added", 0)
+                    + gitlab.get("lines_deleted", 0)
+                )
+            elif source == "github" and field in ("prs_merged", "commits"):
+                value = week_data["github"][field] + gitlab.get(field, 0)
             else:
                 value = week_data[source][field]
-            
             row += f" {value} |"
         
         # Add trend indicator

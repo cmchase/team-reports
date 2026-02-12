@@ -1,0 +1,36 @@
+# GitLab Configuration Example
+# Copy to gitlab_config.yaml and customize. Use for self-hosted (e.g. VPN) or GitLab.com.
+
+# Base URL for GitLab API (use for self-hosted instances)
+# Default: https://gitlab.com - use https://gitlab.cee.redhat.com for Red Hat CEE
+base_url: "https://gitlab.cee.redhat.com"
+
+# List of projects to analyze (path with namespace, e.g. group/subgroup/project)
+# For discovery/unofficial-internal-documentation use:
+projects:
+  - "discovery/unofficial-internal-documentation"
+# For GitLab.com you might use:
+# projects:
+#   - "my-group/my-project"
+
+# Report settings
+report_settings:
+  max_results: 100
+  include_private: true
+  track_merge_requests: true
+  track_commits: true
+  track_issues: true
+  timezone: "UTC"
+  max_contributors_in_overview: 15
+  max_recent_items_per_contributor: 10
+
+# API settings
+api_settings:
+  rate_limit_buffer: 100
+  timeout: 30
+  max_retries: 3
+  retry_delay: 1
+
+# Contributor filters (reuse same bot patterns as in default_config if desired)
+contributor_filters:
+  exclude_bots: true

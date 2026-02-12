@@ -25,7 +25,9 @@ from team_reports.utils.config import (
     load_config_with_defaults,
     get_team_member_name,
     get_all_team_member_emails,
-    get_team_members_dict
+    get_team_members_dict,
+    generate_gitlab_team_members,
+    generate_user_mapping,
 )
 
 
@@ -495,6 +497,80 @@ def sample_team_categories():
             'description': 'DevOps and infrastructure work'
         }
     }
+
+
+class TestGenerateGitlabTeamMembers:
+    """Test generate_gitlab_team_members from team config."""
+
+    def test_generates_gitlab_username_to_display_name(self):
+        team_config = {
+            "team_members": {
+                "alice": {
+                    "display_name": "Alice Smith",
+                    "jira_email": "alice@co.com",
+                    "github_username": "alicesmith",
+                    "gitlab_username": "asmith",
+                },
+                "bob": {
+                    "display_name": "Bob Jones",
+                    "jira_email": "bob@co.com",
+                    "gitlab_username": "bjones",
+                },
+            }
+        }
+        result = generate_gitlab_team_members(team_config)
+        assert result == {"asmith": "Alice Smith", "bjones": "Bob Jones"}
+
+    def test_skips_members_without_gitlab_username(self):
+        team_config = {
+            "team_members": {
+                "alice": {
+                    "display_name": "Alice",
+                    "jira_email": "alice@co.com",
+                    "github_username": "alice",
+                },
+            }
+        }
+        result = generate_gitlab_team_members(team_config)
+        assert result == {}
+
+    def test_empty_team_config_returns_empty_dict(self):
+        assert generate_gitlab_team_members({}) == {}
+        assert generate_gitlab_team_members({"team_members": {}}) == {}
+
+
+class TestGenerateUserMapping:
+    """Test generate_user_mapping includes gitlab_to_jira."""
+
+    def test_includes_github_and_gitlab_to_jira(self):
+        team_config = {
+            "team_members": {
+                "alice": {
+                    "display_name": "Alice",
+                    "jira_email": "alice@co.com",
+                    "github_username": "alicegh",
+                    "gitlab_username": "alicegl",
+                },
+            }
+        }
+        result = generate_user_mapping(team_config)
+        assert "github_to_jira" in result
+        assert "gitlab_to_jira" in result
+        assert result["github_to_jira"] == {"alicegh": "alice@co.com"}
+        assert result["gitlab_to_jira"] == {"alicegl": "alice@co.com"}
+
+    def test_gitlab_to_jira_empty_when_no_gitlab_username(self):
+        team_config = {
+            "team_members": {
+                "alice": {
+                    "display_name": "Alice",
+                    "jira_email": "alice@co.com",
+                    "github_username": "alicegh",
+                },
+            }
+        }
+        result = generate_user_mapping(team_config)
+        assert result["gitlab_to_jira"] == {}
 
 
 if __name__ == "__main__":

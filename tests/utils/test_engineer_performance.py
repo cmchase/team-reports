@@ -588,7 +588,7 @@ class TestBotDetection(unittest.TestCase):
         self.assertIsNone(_normalize_user_id('sourcery-ai[bot]', 'jira', config))
     
     def test_normalize_user_id_cross_system_mapping(self):
-        """Test cross-system user identity mapping."""
+        """Test cross-system user identity mapping (GitHub, GitLab, Jira)."""
         config = {
             'bots': {'patterns': []},
             'user_mapping': {
@@ -596,6 +596,10 @@ class TestBotDetection(unittest.TestCase):
                     'infinitewarp': 'brasmith@redhat.com',
                     'nicolearagao': 'naragao@redhat.com',
                     'mirekdlugosz': 'mzalewsk@redhat.com'
+                },
+                'gitlab_to_jira': {
+                    'brasmith_gl': 'brasmith@redhat.com',
+                    'naragao_gl': 'naragao@redhat.com'
                 }
             }
         }
@@ -604,6 +608,11 @@ class TestBotDetection(unittest.TestCase):
         self.assertEqual(_normalize_user_id('infinitewarp', 'github', config), 'brasmith@redhat.com')
         self.assertEqual(_normalize_user_id('nicolearagao', 'github', config), 'naragao@redhat.com')
         self.assertEqual(_normalize_user_id('mirekdlugosz', 'github', config), 'mzalewsk@redhat.com')
+        
+        # GitLab users should map to Jira emails
+        self.assertEqual(_normalize_user_id('brasmith_gl', 'gitlab', config), 'brasmith@redhat.com')
+        self.assertEqual(_normalize_user_id('naragao_gl', 'gitlab', config), 'naragao@redhat.com')
+        self.assertEqual(_normalize_user_id('unknown-gl', 'gitlab', config), 'unknown-gl')
         
         # Unmapped GitHub users should remain unchanged
         self.assertEqual(_normalize_user_id('unknown-user', 'github', config), 'unknown-user')

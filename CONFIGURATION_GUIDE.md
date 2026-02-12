@@ -65,6 +65,7 @@ JIRA_SERVER=https://your-company.atlassian.net
 JIRA_EMAIL=your-email@company.com
 JIRA_API_TOKEN=your-jira-token
 GITHUB_TOKEN=your-github-token
+GITLAB_TOKEN=your-gitlab-token   # optional; for GitLab (e.g. self-hosted/VPN)
 ```
 
 Use without passing credentials:
@@ -136,11 +137,12 @@ team_members:
     display_name: "Brad Smith"
     jira_email: "brad.smith@company.com"
     github_username: "bradsmith"
-    
+    gitlab_username: "bsmith"   # optional; for GitLab (e.g. self-hosted/VPN)
   alice_manager:
     display_name: "Alice Manager"
     jira_email: "alice.manager@company.com"
     github_username: "alicemanager"
+    gitlab_username: "amanager"
 
 # Team categorization rules
 team_categories:
@@ -159,9 +161,9 @@ team_sizing:
 **Benefits of team_config.yaml:**
 - ✅ **Single source of truth**: All team data in one place
 - ✅ **No duplication**: Same person defined once with all identities
-- ✅ **Cross-system mapping**: Automatically links GitHub ↔ Jira identities
+- ✅ **Cross-system mapping**: Automatically links GitHub, GitLab, and Jira identities
 - ✅ **Easy maintenance**: Add new team members in one location
-- ✅ **Engineer performance**: Unifies data across GitHub and Jira systems
+- ✅ **Engineer performance**: Unifies data across GitHub, GitLab, and Jira systems
 
 ### Base JQL Filter
 This is the core filter that defines which tickets belong to your team:
@@ -225,6 +227,19 @@ report_settings:
   max_results: 150                          # Max tickets to fetch
   order_by: "updated DESC"                  # Sort order for JQL
 ```
+
+### GitLab configuration (optional)
+To include GitLab (e.g. self-hosted or VPN-gated instances like `gitlab.cee.redhat.com`) in weekly reports and engineer performance:
+
+1. Copy the example and set `base_url` and `projects`:
+   ```bash
+   cp config/gitlab_config_example.yaml config/gitlab_config.yaml
+   ```
+2. In `gitlab_config.yaml`, set `base_url` (e.g. `https://gitlab.cee.redhat.com`) and list `projects` by path (e.g. `discovery/unofficial-internal-documentation`).
+3. Add `GITLAB_TOKEN` to your `.env` (or pass `gitlab_token` where supported). Use a GitLab personal access token or project token with `read_api` scope.
+4. In `team_config.yaml`, add optional `gitlab_username` for each member so GitLab activity maps to the same person as Jira and GitHub.
+
+Weekly reports and engineer performance will then include merge requests, commits, and issues from GitLab and unify them with Jira/GitHub via the same team identity mapping.
 
 ## 📝 Real-World Examples
 

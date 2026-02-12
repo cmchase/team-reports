@@ -8,32 +8,38 @@ team_members:
     display_name: "Chad Smith"
     jira_email: "chad.smith@company.com"
     github_username: "chadsmith"
-    
+    gitlab_username: "csmith"  # optional; ties GitLab identity to this person
+
   alice_manager:
     display_name: "Alice Manager"
     jira_email: "alice.manager@company.com"
     github_username: "alicemanager"
-    
+    gitlab_username: "amanager"
+
   bob_developer:
-    display_name: "Bob Developer" 
+    display_name: "Bob Developer"
     jira_email: "bob.dev@company.com"
     github_username: "bobdev"
-    
+    gitlab_username: "bobdev"
+
   carol_engineer:
     display_name: "Carol Engineer"
     jira_email: "carol.engineer@company.com"
     github_username: "caroleng"
-    
+    gitlab_username: "caroleng"
+
   dave_tester:
     display_name: "Dave Tester"
     jira_email: "dave.tester@company.com"
     github_username: "davetester"
+    gitlab_username: "davetester"
 
 # Add new team members here following the same pattern:
 #  john_doe:
 #    display_name: "John Doe"
 #    jira_email: "john.doe@company.com"
 #    github_username: "johndoe"
+#    gitlab_username: "johndoe"  # optional
 
 # Team categorization rules for Jira reports
 # Each category can have components, projects, keywords, and description
