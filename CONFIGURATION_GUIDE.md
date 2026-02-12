@@ -133,11 +133,11 @@ team-reports github weekly \
 # Team members - comprehensive identity mapping
 # Each entry contains all identifiers for a person across systems
 team_members:
-  brad_smith:
-    display_name: "Brad Smith"
-    jira_email: "brad.smith@company.com"
-    github_username: "bradsmith"
-    gitlab_username: "bsmith"   # optional; for GitLab (e.g. self-hosted/VPN)
+  alex_developer:
+    display_name: "Alex Developer"
+    jira_email: "alex.developer@company.com"
+    github_username: "alexdev"
+    gitlab_username: "adev"   # optional; for GitLab (e.g. self-hosted/VPN)
   alice_manager:
     display_name: "Alice Manager"
     jira_email: "alice.manager@company.com"
@@ -229,13 +229,13 @@ report_settings:
 ```
 
 ### GitLab configuration (optional)
-To include GitLab (e.g. self-hosted or VPN-gated instances like `gitlab.cee.redhat.com`) in weekly reports and engineer performance:
+To include GitLab (e.g. self-hosted or VPN-gated instances) in weekly reports and engineer performance:
 
 1. Copy the example and set `base_url` and `projects`:
    ```bash
    cp config/gitlab_config_example.yaml config/gitlab_config.yaml
    ```
-2. In `gitlab_config.yaml`, set `base_url` (e.g. `https://gitlab.cee.redhat.com`) and list `projects` by path (e.g. `discovery/unofficial-internal-documentation`).
+2. In `gitlab_config.yaml`, set `base_url` (e.g. `https://gitlab.example.com`) and list `projects` by path (e.g. `my-group/my-project`).
 3. Add `GITLAB_TOKEN` to your `.env` (or pass `gitlab_token` where supported). Use a GitLab personal access token or project token with `read_api` scope.
 4. In `team_config.yaml`, add optional `gitlab_username` for each member so GitLab activity maps to the same person as Jira and GitHub.
 

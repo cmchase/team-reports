@@ -3,7 +3,7 @@
 GitLab API client for team reports.
 
 Provides merge requests, commits, and issues from GitLab (including self-hosted
-e.g. https://gitlab.cee.redhat.com) with a shape compatible with the summary reporting.
+e.g. https://gitlab.example.com) with a shape compatible with the summary reporting.
 """
 
 import os

@@ -593,32 +593,32 @@ class TestBotDetection(unittest.TestCase):
             'bots': {'patterns': []},
             'user_mapping': {
                 'github_to_jira': {
-                    'infinitewarp': 'brasmith@redhat.com',
-                    'nicolearagao': 'naragao@redhat.com',
-                    'mirekdlugosz': 'mzalewsk@redhat.com'
+                    'dev1_gh': 'dev1@example.com',
+                    'dev2_gh': 'dev2@example.com',
+                    'dev3_gh': 'dev3@example.com'
                 },
                 'gitlab_to_jira': {
-                    'brasmith_gl': 'brasmith@redhat.com',
-                    'naragao_gl': 'naragao@redhat.com'
+                    'dev1_gl': 'dev1@example.com',
+                    'dev2_gl': 'dev2@example.com'
                 }
             }
         }
         
         # GitHub users should map to Jira emails
-        self.assertEqual(_normalize_user_id('infinitewarp', 'github', config), 'brasmith@redhat.com')
-        self.assertEqual(_normalize_user_id('nicolearagao', 'github', config), 'naragao@redhat.com')
-        self.assertEqual(_normalize_user_id('mirekdlugosz', 'github', config), 'mzalewsk@redhat.com')
+        self.assertEqual(_normalize_user_id('dev1_gh', 'github', config), 'dev1@example.com')
+        self.assertEqual(_normalize_user_id('dev2_gh', 'github', config), 'dev2@example.com')
+        self.assertEqual(_normalize_user_id('dev3_gh', 'github', config), 'dev3@example.com')
         
         # GitLab users should map to Jira emails
-        self.assertEqual(_normalize_user_id('brasmith_gl', 'gitlab', config), 'brasmith@redhat.com')
-        self.assertEqual(_normalize_user_id('naragao_gl', 'gitlab', config), 'naragao@redhat.com')
+        self.assertEqual(_normalize_user_id('dev1_gl', 'gitlab', config), 'dev1@example.com')
+        self.assertEqual(_normalize_user_id('dev2_gl', 'gitlab', config), 'dev2@example.com')
         self.assertEqual(_normalize_user_id('unknown-gl', 'gitlab', config), 'unknown-gl')
         
         # Unmapped GitHub users should remain unchanged
         self.assertEqual(_normalize_user_id('unknown-user', 'github', config), 'unknown-user')
         
         # Jira users should remain unchanged (canonical form)
-        self.assertEqual(_normalize_user_id('brasmith@redhat.com', 'jira', config), 'brasmith@redhat.com')
+        self.assertEqual(_normalize_user_id('dev1@example.com', 'jira', config), 'dev1@example.com')
 
 
 class TestActiveEngineerFiltering(unittest.TestCase):

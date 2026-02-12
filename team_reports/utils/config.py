@@ -541,7 +541,7 @@ def generate_jira_team_members(team_config: Dict[str, Any]) -> Dict[str, str]:
         Dict mapping jira_email -> display_name
         
     Example:
-        {"brasmith@redhat.com": "Brad Smith"}
+        {"dev1@example.com": "Dev One"}
     """
     team_members = team_config.get('team_members', {})
     jira_mapping = {}
@@ -567,7 +567,7 @@ def generate_github_team_members(team_config: Dict[str, Any]) -> Dict[str, str]:
         Dict mapping github_username -> display_name
         
     Example:
-        {"infinitewarp": "Brad Smith"}
+        {"dev1_gh": "Dev One"}
     """
     team_members = team_config.get('team_members', {})
     github_mapping = {}
@@ -593,7 +593,7 @@ def generate_gitlab_team_members(team_config: Dict[str, Any]) -> Dict[str, str]:
         Dict mapping gitlab_username -> display_name
         
     Example:
-        {"csmith": "Chad Smith"}
+        {"dev1_gl": "Dev One"}
     """
     team_members = team_config.get('team_members', {})
     gitlab_mapping = {}
@@ -619,8 +619,8 @@ def generate_user_mapping(team_config: Dict[str, Any]) -> Dict[str, Dict[str, st
         Dict with github_to_jira and gitlab_to_jira mappings
         
     Example:
-        {"github_to_jira": {"infinitewarp": "brasmith@redhat.com"},
-         "gitlab_to_jira": {"csmith": "brasmith@redhat.com"}}
+        {"github_to_jira": {"dev1_gh": "dev1@example.com"},
+         "gitlab_to_jira": {"dev1_gl": "dev1@example.com"}}
     """
     team_members = team_config.get('team_members', {})
     github_to_jira = {}
