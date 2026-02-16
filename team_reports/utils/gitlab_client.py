@@ -51,6 +51,8 @@ class GitLabApiClient:
         base = (self.config.get("base_url") or "https://gitlab.com").rstrip("/")
         self.base_url = f"{base}/api/v4"
         self.headers = {"PRIVATE-TOKEN": self.gitlab_token}
+        api_settings = self.config.get("api_settings") or {}
+        self.verify_ssl = api_settings.get("verify_ssl", True)
 
     def _project_id_param(self, project: str) -> str:
         """Return project identifier for API (URL-encoded path)."""
@@ -70,7 +72,9 @@ class GitLabApiClient:
             if params:
                 request_params.update(params)
 
-            response = requests.get(url, headers=self.headers, params=request_params)
+            response = requests.get(
+                url, headers=self.headers, params=request_params, verify=self.verify_ssl
+            )
             response.raise_for_status()
 
             data = response.json()
@@ -146,9 +150,13 @@ class GitLabApiClient:
         }
 
     def fetch_merge_requests(
-        self, project: str, start_date: str, end_date: str
+        self,
+        project: str,
+        start_date: str,
+        end_date: str,
+        updated_after: Optional[str] = None,
     ) -> List[Dict]:
-        """Fetch merge requests merged in the date range."""
+        """Fetch merge requests merged in the date range. updated_after filters by updated_at when set (ISO8601)."""
         print(f"  Fetching merge requests for {project} from {start_date} to {end_date}...")
         proj_id = self._project_id_param(project)
         endpoint = f"projects/{proj_id}/merge_requests"
@@ -158,6 +166,8 @@ class GitLabApiClient:
             "sort": "desc",
             "per_page": 100,
         }
+        if updated_after:
+            params["updated_after"] = updated_after
         mrs = self._make_request(endpoint, params)
 
         start_dt = datetime.fromisoformat(f"{start_date}T00:00:00+00:00")
@@ -214,19 +224,25 @@ class GitLabApiClient:
         return normalized
 
     def fetch_all_data(
-        self, start_date: str, end_date: str
+        self,
+        start_date: str,
+        end_date: str,
+        updated_since: Optional[str] = None,
+        cursor: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Dict[str, List[Dict]]]:
-        """Fetch MRs, commits, and issues for all projects (keyed by project path)."""
+        """Fetch MRs, commits, and issues for all projects. updated_since passed as updated_after for MRs when set."""
         all_data = {
             "pull_requests": {},
             "commits": {},
             "issues": {},
         }
+        if cursor is None:
+            cursor = {}
         print(f"  Fetching GitLab data for {len(self.projects)} projects...")
         for project in self.projects:
             try:
                 all_data["pull_requests"][project] = self.fetch_merge_requests(
-                    project, start_date, end_date
+                    project, start_date, end_date, updated_after=updated_since
                 )
                 all_data["commits"][project] = self.fetch_commits(
                     project, start_date, end_date

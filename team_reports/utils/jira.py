@@ -68,7 +68,8 @@ def initialize_jira_client(
 
 def build_jql_with_dates(base_jql: str, start_date: str, end_date: str, 
                         config: Optional[Dict[str, Any]] = None,
-                        status_filter_type: str = 'completed') -> str:
+                        status_filter_type: str = 'completed',
+                        updated_since: Optional[str] = None) -> str:
     """
     Build JQL query with date range filter and optional status filters.
     
@@ -79,6 +80,7 @@ def build_jql_with_dates(base_jql: str, start_date: str, end_date: str,
         config: Optional configuration dict with status_filters and report_settings
         status_filter_type: Which status filter to use from config['status_filters']
                            (e.g., 'execution', 'completed', 'planned')
+        updated_since: Optional ISO8601 datetime; if set, add "updated >= ..." to avoid missing recent updates.
         
     Returns:
         str: Complete JQL query with date filters and ordering
@@ -101,6 +103,12 @@ def build_jql_with_dates(base_jql: str, start_date: str, end_date: str,
     
     # Build filter components
     filters = [f'({base_jql})', f'({date_filter})']
+    if updated_since:
+        # Jira accepts "updated >= 'yyyy-MM-dd HH:mm'" or ISO with T
+        ts = updated_since.replace("T", " ").replace("Z", "").strip()
+        if len(ts) > 19:
+            ts = ts[:19]
+        filters.append(f'(updated >= "{ts}")')
     
     # Add status filter if configured - use configurable filter type
     if config and 'status_filters' in config and status_filter_type in config['status_filters']:

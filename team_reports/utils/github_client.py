@@ -174,19 +174,26 @@ class GitHubApiClient:
         """Build full repository path with organization if configured."""
         return f"{self.github_org}/{repo}" if self.github_org else repo
     
-    def fetch_pull_requests(self, repo: str, start_date: str, end_date: str) -> List[Dict]:
+    def fetch_pull_requests(
+        self,
+        repo: str,
+        start_date: str,
+        end_date: str,
+        updated_since: Optional[str] = None,
+    ) -> List[Dict]:
         """Fetch pull requests for a repository in the date range with detailed information."""
         print(f"🔍 Fetching pull requests for {repo} from {start_date} to {end_date}...")
-        
+
         repo_path = self._build_repo_path(repo)
         endpoint = f"repos/{repo_path}/pulls"
+        since_val = (updated_since or start_date).split("T")[0] if (updated_since or start_date) else start_date
         params = {
             'state': 'all',  # Get open, closed, and merged PRs
-            'since': start_date,
+            'since': since_val,
             'sort': 'updated',
             'direction': 'desc'
         }
-        
+
         prs = self._make_request(endpoint, params)
         
         # Filter by date range (GitHub API doesn't support date range filtering directly)
@@ -228,14 +235,23 @@ class GitHubApiClient:
         
         return filtered_prs
     
-    def fetch_commits(self, repo: str, start_date: str, end_date: str) -> List[Dict]:
+    def fetch_commits(
+        self,
+        repo: str,
+        start_date: str,
+        end_date: str,
+        updated_since: Optional[str] = None,
+    ) -> List[Dict]:
         """Fetch commits for a repository in the date range."""
         print(f"🔍 Fetching commits for {repo} from {start_date} to {end_date}...")
-        
+
         repo_path = self._build_repo_path(repo)
         endpoint = f"repos/{repo_path}/commits"
+        since_iso = f"{start_date}T00:00:00Z"
+        if updated_since:
+            since_iso = updated_since if "T" in updated_since else f"{updated_since[:10]}T00:00:00Z"
         params = {
-            'since': f"{start_date}T00:00:00Z",
+            'since': since_iso,
             'until': f"{end_date}T23:59:59Z"
         }
         
@@ -285,23 +301,35 @@ class GitHubApiClient:
         
         return filtered_issues
     
-    def fetch_all_data(self, start_date: str, end_date: str) -> Dict[str, Dict[str, List[Dict]]]:
-        """Fetch all GitHub data for the specified date range."""
+    def fetch_all_data(
+        self,
+        start_date: str,
+        end_date: str,
+        updated_since: Optional[str] = None,
+        cursor: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Dict[str, List[Dict]]]:
+        """Fetch all GitHub data for the specified date range. updated_since narrows PR/commit lists when set."""
         all_data = {
             'pull_requests': {},
             'commits': {},
             'issues': {}
         }
-        
+        if cursor is None:
+            cursor = {}
+
         print(f"🚀 Fetching GitHub data for {len(self.repositories)} repositories...")
-        
+
         for repo in self.repositories:
             repo_path = self._build_repo_path(repo)
             print(f"\n📁 Processing repository: {repo}")
-            
+
             try:
-                all_data['pull_requests'][repo_path] = self.fetch_pull_requests(repo, start_date, end_date)
-                all_data['commits'][repo_path] = self.fetch_commits(repo, start_date, end_date)
+                all_data['pull_requests'][repo_path] = self.fetch_pull_requests(
+                    repo, start_date, end_date, updated_since=updated_since
+                )
+                all_data['commits'][repo_path] = self.fetch_commits(
+                    repo, start_date, end_date, updated_since=updated_since
+                )
                 all_data['issues'][repo_path] = self.fetch_issues(repo, start_date, end_date)
                 
                 pr_count = len(all_data['pull_requests'][repo_path])
