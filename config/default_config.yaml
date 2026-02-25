@@ -3,16 +3,6 @@
 # User configs (jira_config.yaml, github_config.yaml) can override these values
 # Environment variables can override both
 
-# Metrics engine: week boundary and business-day rules (optional)
-# Used by team_reports.engine for dataset bucketing and time rules in dataset_latest.json
-engine:
-  time_rules:
-    team_timezone: "UTC"
-    week_boundary_start_day: "WEDNESDAY"
-    week_boundary_end_day: "TUESDAY"
-    working_days: [0, 1, 2, 3, 4]  # Monday=0 .. Friday=4
-    business_day_mode: "weekday_only"
-
 # base_jql is overridden by config/jira_config.yaml (set your project/filter there, e.g. project = DISCOVERY)
 jira:
   base_jql: ""

@@ -313,15 +313,23 @@ def save_report(content: str, filename: str, reports_dir: str = "Reports") -> st
     
     Args:
         content: Report content to save
-        filename: Filename for the report
+        filename: Filename for the report (must not contain path separators or '..')
         reports_dir: Directory to save reports in
         
     Returns:
         str: Full path to the saved file
         
+    Raises:
+        ValueError: If filename contains path traversal or path separators.
+        
     Example:
         filepath = save_report(report_content, 'jira_weekly_summary.md')
     """
+    # Prevent path traversal: only allow a single path component
+    if not filename or os.path.basename(filename) != filename or ".." in filename:
+        raise ValueError(
+            f"Invalid filename: must be a simple filename without path separators or '..'. Got {filename!r}"
+        )
     reports_path = ensure_reports_directory(reports_dir)
     filepath = os.path.join(reports_path, filename)
     

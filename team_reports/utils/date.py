@@ -37,9 +37,18 @@ def parse_date_args(args: Optional[list] = None) -> Tuple[str, str]:
     if len(args) >= 2:
         start_date = args[0]
         end_date = args[1]
+        if not validate_date_format(start_date) or not validate_date_format(end_date):
+            raise ValueError(
+                "Dates must be in YYYY-MM-DD format. "
+                f"Got start_date={start_date!r}, end_date={end_date!r}"
+            )
     elif len(args) == 1:
         # Single date provided, assume it's the start of the week
         start_date = args[0]
+        if not validate_date_format(start_date):
+            raise ValueError(
+                f"Date must be in YYYY-MM-DD format. Got {start_date!r}"
+            )
         start_dt = datetime.strptime(start_date, '%Y-%m-%d')
         end_dt = start_dt + timedelta(days=6)
         end_date = end_dt.strftime('%Y-%m-%d')
