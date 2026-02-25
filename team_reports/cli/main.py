@@ -16,10 +16,17 @@ load_dotenv()
 
 from team_reports.reports.jira_weekly import WeeklyJiraSummary
 from team_reports.reports.jira_quarterly import QuarterlyTeamSummary
+from team_reports.reports.jira_flow_metrics import JiraFlowMetricsReport
 from team_reports.reports.github_weekly import WeeklyGitHubSummary
 from team_reports.reports.github_quarterly import GitHubQuarterlySummary
 from team_reports.reports.engineer_performance import EngineerQuarterlyPerformance
-from team_reports.utils.date import get_current_week, get_current_quarter, parse_date_args
+from team_reports.utils.date import (
+    get_current_week,
+    get_current_quarter,
+    get_date_range_for_days,
+    get_quarter_range,
+    parse_date_args,
+)
 # Note: batch command temporarily disabled - use shell script ./run_batch_weekly.sh instead
 
 
@@ -154,6 +161,67 @@ def jira_quarterly(year: Optional[int], quarter: Optional[int], config: str,
         click.echo(click.style("✅ Report generated successfully!", fg='green'))
         click.echo(f"📄 Report saved to: {filepath}")
         click.echo(f"📅 Period: Q{quarter} {year}")
+        
+    except Exception as e:
+        import traceback
+        click.echo(click.style(f"❌ Error: {e}", fg='red'), err=True)
+        traceback.print_exc()
+        sys.exit(1)
+
+
+@jira.command('flow-metrics')
+@click.option('--days', type=int, default=None, help='Number of days (default: 30 if no quarter given)')
+@click.option('--quarter', type=int, default=None, help='Quarter 1-4 (use with --year)')
+@click.option('--year', type=int, default=None, help='Year (use with --quarter), e.g. 2025')
+@click.option('--start', 'start_date', type=str, default=None, help='Start date YYYY-MM-DD')
+@click.option('--end', 'end_date', type=str, default=None, help='End date YYYY-MM-DD')
+@click.option('--max-issues', type=int, default=300, help='Max issues to fetch with changelog (default: 300)')
+@click.option('--config', default='config/jira_config.yaml', help='Path to Jira configuration file')
+@click.option('--jira-server', help='Jira server URL (overrides environment)')
+@click.option('--jira-email', help='Jira email (overrides environment)')
+@click.option('--jira-token', help='Jira API token (overrides environment)')
+def jira_flow_metrics(days: Optional[int], quarter: Optional[int], year: Optional[int],
+                     start_date: Optional[str], end_date: Optional[str], max_issues: int, config: str,
+                     jira_server: Optional[str], jira_email: Optional[str], jira_token: Optional[str]):
+    """Generate flow metrics report (cycle time, lead time, throughput) and save to disk.
+    
+    Fetches issues resolved in the period and computes cycle time (execution → done)
+    and lead time (created → done) using status_filters from config.
+    
+    Date range: use --quarter and --year (e.g. Q3 2025), or --start/--end, or --days.
+    
+    Examples:
+        team-reports jira flow-metrics
+        team-reports jira flow-metrics --days 7
+        team-reports jira flow-metrics --quarter 3 --year 2025
+        team-reports jira flow-metrics --start 2025-07-01 --end 2025-09-30
+    """
+    try:
+        if start_date and end_date:
+            start, end = start_date, end_date
+        elif quarter is not None and year is not None:
+            if not (1 <= quarter <= 4):
+                raise ValueError("--quarter must be 1, 2, 3, or 4")
+            start, end = get_quarter_range(year, quarter)
+        else:
+            start, end = get_date_range_for_days(days if days is not None else 30)
+        click.echo(f"Generating flow metrics: {start} to {end} (max_issues={max_issues})...")
+        click.echo("Fetching from Jira (changelog can take several minutes)...")
+        
+        report = JiraFlowMetricsReport(
+            config_file=config,
+            jira_server=jira_server,
+            jira_email=jira_email,
+            jira_token=jira_token,
+        )
+        summary = report.generate_report(start, end, max_issues=max_issues)
+        
+        from team_reports.utils.report import save_report
+        filename = f"Flow_Metrics_{start}_to_{end}.md"
+        filepath = save_report(summary, filename)
+        
+        click.echo(click.style("✅ Flow metrics report generated successfully!", fg='green'))
+        click.echo(f"📄 Report saved to: {filepath}")
         
     except Exception as e:
         import traceback

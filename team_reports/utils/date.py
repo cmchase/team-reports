@@ -106,14 +106,14 @@ def get_week_starting(date_str: str) -> Tuple[str, str]:
 def get_date_range(start_date: str, days: int) -> Tuple[str, str]:
     """
     Get a date range starting from a given date.
-    
+
     Args:
         start_date: Start date in YYYY-MM-DD format
         days: Number of days to add (can be negative for past dates)
-        
+
     Returns:
         Tuple[str, str]: (start_date, end_date) in YYYY-MM-DD format
-        
+
     Example:
         start, end = get_date_range("2025-01-01", 6)
         # Returns ("2025-01-01", "2025-01-07")
@@ -121,6 +121,25 @@ def get_date_range(start_date: str, days: int) -> Tuple[str, str]:
     start_dt = datetime.strptime(start_date, '%Y-%m-%d')
     end_dt = start_dt + timedelta(days=days)
     return start_date, end_dt.strftime('%Y-%m-%d')
+
+
+def get_date_range_for_days(days: int) -> Tuple[str, str]:
+    """
+    Return (start_date, end_date) as YYYY-MM-DD for the last `days` days (relative to now).
+
+    Args:
+        days: Number of days to include (end = today, start = today - days).
+
+    Returns:
+        Tuple[str, str]: (start_date, end_date) in YYYY-MM-DD format
+
+    Example:
+        start, end = get_date_range_for_days(30)
+        # Returns e.g. ("2025-01-26", "2025-02-25") for last 30 days
+    """
+    end_dt = datetime.now()
+    start_dt = end_dt - timedelta(days=days)
+    return start_dt.strftime('%Y-%m-%d'), end_dt.strftime('%Y-%m-%d')
 
 
 def get_month_range(year: int, month: int) -> Tuple[str, str]:

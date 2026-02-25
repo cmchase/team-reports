@@ -17,15 +17,16 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 from team_reports.utils.date import (
     parse_date_args,
     get_current_week,
-    get_last_week, 
+    get_last_week,
     get_week_starting,
     get_date_range,
+    get_date_range_for_days,
     get_month_range,
     format_date_for_display,
     validate_date_format,
     get_quarter_range,
     get_current_quarter,
-    parse_quarter_from_date
+    parse_quarter_from_date,
 )
 
 
@@ -183,6 +184,28 @@ class TestGetDateRange:
         start, end = get_date_range("2025-01-28", 7)
         assert start == "2025-01-28"
         assert end == "2025-02-04"
+
+
+class TestGetDateRangeForDays:
+    """Test get_date_range_for_days function (last N days ending today)."""
+
+    @patch("team_reports.utils.date.datetime")
+    def test_get_date_range_for_days(self, mock_datetime):
+        """Test last 30 days."""
+        mock_now = datetime(2025, 2, 25)
+        mock_datetime.now.return_value = mock_now
+        start, end = get_date_range_for_days(30)
+        assert start == "2025-01-26"
+        assert end == "2025-02-25"
+
+    @patch("team_reports.utils.date.datetime")
+    def test_get_date_range_for_days_7(self, mock_datetime):
+        """Test last 7 days."""
+        mock_now = datetime(2025, 2, 25)
+        mock_datetime.now.return_value = mock_now
+        start, end = get_date_range_for_days(7)
+        assert start == "2025-02-18"
+        assert end == "2025-02-25"
 
 
 class TestGetMonthRange:

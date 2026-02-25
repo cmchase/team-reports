@@ -7,7 +7,7 @@ building JQL queries, and fetching tickets with various filters.
 """
 
 import os
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 from jira import JIRA
 
@@ -358,3 +358,131 @@ def compute_cycle_time_stats(cycle_times: List[float]) -> Dict[str, float]:
         'median': round(median, 1), 
         'p90': round(p90, 1)
     }
+
+
+def flow_stats(values: List[float]) -> Dict[str, float]:
+    """
+    Compute flow metrics statistics: avg, median, min, max, std_dev, p85, p95, count.
+    Excludes zeros and negatives. Used for cycle time and lead time reporting.
+    """
+    valid = [v for v in values if v is not None and v >= 0]
+    if not valid:
+        return {
+            "avg": 0.0, "median": 0.0, "min": 0.0, "max": 0.0,
+            "std_dev": 0.0, "p85": 0.0, "p95": 0.0, "count": 0,
+        }
+    n = len(valid)
+    sorted_v = sorted(valid)
+    avg = sum(sorted_v) / n
+    median = (sorted_v[(n - 1) // 2] + sorted_v[n // 2]) / 2 if n > 0 else sorted_v[0]
+    min_v = min(sorted_v)
+    max_v = max(sorted_v)
+    variance = sum((x - avg) ** 2 for x in sorted_v) / n if n else 0
+    std_dev = (variance ** 0.5) if variance >= 0 else 0.0
+    p85_idx = max(0, int(0.85 * n) - 1)
+    p95_idx = max(0, int(0.95 * n) - 1)
+    return {
+        "avg": round(avg, 2), "median": round(median, 2), "min": round(min_v, 2), "max": round(max_v, 2),
+        "std_dev": round(std_dev, 2), "p85": round(sorted_v[p85_idx], 2), "p95": round(sorted_v[p95_idx], 2),
+        "count": n,
+    }
+
+
+def format_duration_days(days: float) -> str:
+    """Format a duration in days as human-readable (e.g. '2 weeks 3 days' or '< 1 minute')."""
+    if days < 0:
+        return "0 days"
+    if days < 1 / (24 * 60):  # less than 1 minute
+        return "< 1 minute"
+    if days < 1:
+        hours = round(days * 24)
+        return f"{hours} hour{'s' if hours != 1 else ''}"
+    weeks = int(days // 7)
+    remainder_days = int(round(days % 7))
+    parts = []
+    if weeks > 0:
+        parts.append(f"{weeks} week{'s' if weeks != 1 else ''}")
+    if remainder_days > 0 or not parts:
+        parts.append(f"{remainder_days} day{'s' if remainder_days != 1 else ''}")
+    return " ".join(parts)
+
+
+def cycle_and_lead_from_issue(
+    issue: Any,
+    execution_statuses: List[str],
+    completed_statuses: List[str],
+) -> Tuple[Optional[float], Optional[float]]:
+    """
+    Compute cycle time and lead time in days from a Jira issue with changelog.
+    Cycle: first transition into any execution status -> first transition into any completed status.
+    Lead: issue created -> first transition into any completed status.
+    Returns (cycle_days, lead_days); either may be None if not computable.
+    """
+    try:
+        created_str = getattr(issue.fields, "created", None) or ""
+        if created_str:
+            created_dt = datetime.strptime(created_str[:19], "%Y-%m-%dT%H:%M:%S")
+        else:
+            created_dt = None
+        resolution_str = getattr(issue.fields, "resolutiondate", None) or ""
+        resolution_dt = None
+        if resolution_str:
+            try:
+                resolution_dt = datetime.strptime(resolution_str[:19], "%Y-%m-%dT%H:%M:%S")
+            except ValueError:
+                pass
+        changelog = getattr(issue, "changelog", None)
+        if not changelog or not getattr(changelog, "histories", None):
+            if created_dt and resolution_dt:
+                lead_days = (resolution_dt - created_dt).total_seconds() / (24 * 3600)
+                return (None, lead_days)
+            return (None, None)
+        histories = sorted(changelog.histories, key=lambda h: h.created)
+        first_execution = None
+        first_done = None
+        for history in histories:
+            for item in getattr(history, "items", []):
+                if getattr(item, "field", None) != "status":
+                    continue
+                to_str = (getattr(item, "toString", None) or "").strip()
+                if not to_str:
+                    continue
+                try:
+                    created_time = datetime.strptime(history.created[:19], "%Y-%m-%dT%H:%M:%S")
+                except ValueError:
+                    continue
+                if to_str in execution_statuses and first_execution is None:
+                    first_execution = created_time
+                if to_str in completed_statuses and first_done is None:
+                    first_done = created_time
+                if first_execution and first_done:
+                    break
+            if first_execution and first_done:
+                break
+        cycle_days = None
+        if first_execution and first_done and first_done > first_execution:
+            cycle_days = (first_done - first_execution).total_seconds() / (24 * 3600)
+        lead_days = None
+        if first_done and created_dt:
+            lead_days = (first_done - created_dt).total_seconds() / (24 * 3600)
+        elif resolution_dt and created_dt:
+            lead_days = (resolution_dt - created_dt).total_seconds() / (24 * 3600)
+        return (cycle_days, lead_days)
+    except Exception:
+        return (None, None)
+
+
+def fetch_flow_issues(
+    jira_client: JIRA, jql: str, max_issues: int
+) -> Tuple[int, List[Any]]:
+    """
+    Fetch total count and issues with changelog for flow metrics.
+    Returns (total_throughput, list of issues with changelog).
+    """
+    count_result = jira_client.search_issues(jql, maxResults=0)
+    total_throughput = getattr(count_result, "total", 0)
+    if total_throughput == 0:
+        return (0, [])
+    fetch_count = min(total_throughput, max_issues)
+    issues = jira_client.search_issues(jql, maxResults=fetch_count, expand="changelog")
+    return (total_throughput, list(issues))
