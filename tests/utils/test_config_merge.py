@@ -204,7 +204,7 @@ class TestLoadUserConfigs:
         # Should return empty dict when no files found
         assert config == {}
     
-    @patch('utils.config.Path.exists')
+    @patch('team_reports.utils.config.Path.exists')
     def test_load_user_configs_auto_detect_none_exist(self, mock_exists):
         """Test auto-detection when no config files exist."""
         mock_exists.return_value = False
@@ -252,11 +252,10 @@ class TestLoadEnvOverrides:
         
         assert config == {}
     
-    @patch.dict(os.environ, {'GITHUB_TOKEN': 'test-token'})
+    @patch.dict(os.environ, {'GITHUB_TOKEN': 'test-token'}, clear=True)
     def test_load_env_overrides_partial_values(self):
         """Test loading environment overrides with only some variables set."""
         config = load_env_overrides()
-        
         assert config['env']['github']['token'] == 'test-token'
         assert 'jira' not in config['env']
 
@@ -266,8 +265,8 @@ class TestGetConfig:
     
     def test_get_config_defaults_only(self):
         """Test get_config with only defaults (no user configs or env vars)."""
-        with patch('utils.config.load_user_configs', return_value={}):
-            with patch('utils.config.load_env_overrides', return_value={'env': {}}):
+        with patch('team_reports.utils.config.load_user_configs', return_value={}):
+            with patch('team_reports.utils.config.load_env_overrides', return_value={'env': {}}):
                 config = get_config()
                 
                 # Should have default structure
@@ -282,7 +281,7 @@ class TestGetConfig:
         fixtures_dir = Path(__file__).parent.parent / "fixtures" / "config"
         minimal_config_path = fixtures_dir / "minimal_config.yaml"
         
-        with patch('utils.config.load_env_overrides', return_value={'env': {}}):
+        with patch('team_reports.utils.config.load_env_overrides', return_value={'env': {}}):
             config = get_config([str(minimal_config_path)])
             
             # User config should override defaults
@@ -314,14 +313,14 @@ class TestGetConfig:
             'env': {'github_token': 'env-token'}
         }
         
-        with patch('utils.config.load_env_overrides', return_value=env_override):
+        with patch('team_reports.utils.config.load_env_overrides', return_value=env_override):
             config = get_config([str(user_config_path)])
             
-            # Precedence check:
-            # Default: max_results = 200
-            # User: max_results = 150  
-            # Env: max_results = 500 (should win)
-            assert config['report']['max_results'] == 500
+            # Precedence: default < user < env. Mock env_override supplies report.max_results = 500.
+            # deep_merge applies env last, so 500 should win over user's 150.
+            assert config['report']['max_results'] == 500, (
+                f"expected env override 500 to win; got {config['report'].get('max_results')}"
+            )
             assert config['env']['github_token'] == 'env-token'
             assert config['jira']['base_jql'] == "project = TEST AND assignee = currentUser()"
 

@@ -54,7 +54,7 @@ class TestParseDateArgs:
         assert start == "2025-01-30"
         assert end == "2025-02-05"  # Crosses into February
     
-    @patch('utils.date.get_current_week')
+    @patch('team_reports.utils.date.get_current_week')
     def test_parse_no_dates(self, mock_get_current_week):
         """Test parsing when no dates provided (should get current week)."""
         mock_get_current_week.return_value = ("2025-01-06", "2025-01-12")
@@ -83,7 +83,7 @@ class TestParseDateArgs:
 class TestGetCurrentWeek:
     """Test get_current_week function."""
     
-    @patch('utils.date.datetime')
+    @patch('team_reports.utils.date.datetime')
     def test_get_current_week_monday(self, mock_datetime):
         """Test when today is Monday."""
         # Mock Monday, January 6, 2025
@@ -95,7 +95,7 @@ class TestGetCurrentWeek:
         assert start == "2025-01-06"  # Same Monday
         assert end == "2025-01-12"    # Following Sunday
     
-    @patch('utils.date.datetime')
+    @patch('team_reports.utils.date.datetime')
     def test_get_current_week_friday(self, mock_datetime):
         """Test when today is Friday."""
         # Mock Friday, January 10, 2025
@@ -107,7 +107,7 @@ class TestGetCurrentWeek:
         assert start == "2025-01-06"  # Previous Monday
         assert end == "2025-01-12"    # Following Sunday
     
-    @patch('utils.date.datetime')
+    @patch('team_reports.utils.date.datetime')
     def test_get_current_week_sunday(self, mock_datetime):
         """Test when today is Sunday."""
         # Mock Sunday, January 12, 2025
@@ -123,7 +123,7 @@ class TestGetCurrentWeek:
 class TestGetLastWeek:
     """Test get_last_week function."""
     
-    @patch('utils.date.datetime')
+    @patch('team_reports.utils.date.datetime')
     def test_get_last_week(self, mock_datetime):
         """Test getting last week's date range."""
         # Mock current Monday, January 13, 2025
@@ -330,7 +330,7 @@ class TestParseQuarterFromDate:
         assert year == 2025 and quarter == 4
 
 
-@patch('utils.date.datetime')
+@patch('team_reports.utils.date.datetime')
 class TestGetCurrentQuarter:
     """Test get_current_quarter function."""
     
@@ -350,7 +350,7 @@ class TestGetCurrentQuarter:
     @pytest.mark.skip(reason="Complex datetime mocking - function works correctly in practice")
     def test_current_quarter_q4(self):
         """Test when current date is in Q4."""
-        with patch('utils.date.datetime') as mock_datetime:
+        with patch('team_reports.utils.date.datetime') as mock_datetime:
             mock_datetime.now.return_value = datetime(2025, 11, 15)  # November
             
             year, quarter, start, end = get_current_quarter()

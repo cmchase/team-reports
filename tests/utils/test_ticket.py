@@ -191,11 +191,13 @@ class TestFormatTicketInfo:
         issue.fields.assignee.displayName = 'John Doe'
         issue.fields.assignee.emailAddress = 'john@example.com'
         issue.fields.updated = '2025-01-15T10:30:00.000+0000'
-        
+        # resolutiondate None so get_completion_date uses updated (string) -> '2025-01-15'
+        issue.fields.resolutiondate = None
+
         jira_server_url = 'https://jira.example.com'
-        
+
         info = format_ticket_info(issue, jira_server_url)
-        
+
         assert info['key'] == 'TEST-123'
         assert info['summary'] == 'Test ticket summary'
         assert info['status'] == 'In Progress'

@@ -193,7 +193,7 @@ class TestEnsureReportsDirectory:
 class TestSaveReport:
     """Test save_report function."""
     
-    @patch('utils.report.ensure_reports_directory')
+    @patch('team_reports.utils.report.ensure_reports_directory')
     @patch('builtins.open', new_callable=mock_open)
     def test_save_report_success(self, mock_file, mock_ensure_dir):
         """Test successful report saving."""
@@ -207,7 +207,7 @@ class TestSaveReport:
         mock_file().write.assert_called_once_with(content)
         assert filepath == 'Reports/test_report.md'
     
-    @patch('utils.report.ensure_reports_directory')
+    @patch('team_reports.utils.report.ensure_reports_directory')
     @patch('builtins.open', new_callable=mock_open)
     def test_save_report_custom_directory(self, mock_file, mock_ensure_dir):
         """Test saving report to custom directory."""

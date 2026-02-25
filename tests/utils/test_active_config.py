@@ -194,7 +194,7 @@ class TestRenderActiveConfig:
             'settings': {'max_results': 100}
         }
         
-        with patch('utils.report.datetime') as mock_datetime:
+        with patch('team_reports.utils.report.datetime') as mock_datetime:
             mock_datetime.now.return_value.strftime.return_value = '2025-01-15 14:30:00 UTC'
             
             result = render_active_config(config)

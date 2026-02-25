@@ -189,7 +189,7 @@ class TestJiraMetricsExtraction(unittest.TestCase):
         """Test basic Jira metrics extraction."""
         tickets = [self.mock_ticket_completed, self.mock_ticket_in_progress]
         
-        with patch('utils.jira.compute_cycle_time_days', return_value=2.5):
+        with patch('team_reports.utils.jira.compute_cycle_time_days', return_value=2.5):
             metrics = _extract_jira_engineer_metrics(
                 tickets, '2025-04-01', '2025-04-07', self.config, Mock()
             )
@@ -447,9 +447,9 @@ class TestWeeklyMetricsTable(unittest.TestCase):
 class TestEngineerPerformanceIntegration(unittest.TestCase):
     """Integration tests for engineer performance analysis."""
     
-    @patch('utils.engineer_performance.GitHubApiClient')
-    @patch('utils.engineer_performance.JiraApiClient')
-    @patch('utils.engineer_performance.get_config')
+    @patch('team_reports.utils.engineer_performance.GitHubApiClient')
+    @patch('team_reports.utils.engineer_performance.JiraApiClient')
+    @patch('team_reports.utils.config.get_config')
     def test_collect_weekly_engineer_data_integration(self, mock_get_config, mock_jira_client_class, mock_github_client_class):
         """Test end-to-end weekly data collection."""
         # Mock GitHub client
@@ -478,6 +478,8 @@ class TestEngineerPerformanceIntegration(unittest.TestCase):
         mock_ticket = Mock()
         mock_ticket.fields.assignee.emailAddress = 'john.doe@company.com'
         mock_ticket.fields.status.name = 'Done'
+        mock_ticket.fields.resolutiondate = '2025-04-10T12:00:00.000+0000'  # so completion_date is a string
+        mock_ticket.fields.updated = '2025-04-10T12:00:00.000+0000'
         mock_jira_client.fetch_tickets.return_value = [mock_ticket]
         mock_jira_client_class.return_value = mock_jira_client
         
@@ -497,17 +499,17 @@ class TestEngineerPerformanceIntegration(unittest.TestCase):
         mock_get_config.return_value = config
         
         # This would be a long-running test in reality, so we'll mock the weekly ranges
-        with patch('utils.engineer_performance.generate_weekly_date_ranges', 
+        with patch('team_reports.utils.engineer_performance.generate_weekly_date_ranges',
                   return_value=[('2025-04-07', '2025-04-13')]):
             
             engineer_data = collect_weekly_engineer_data(2025, 2, 'mock_jira_config.yaml', 'mock_github_config.yaml')
             
-            # Verify structure
-            self.assertIn('john.doe', engineer_data)
-            self.assertIn('weeks', engineer_data['john.doe'])
-            self.assertIn('2025-04-07', engineer_data['john.doe']['weeks'])
+            # Verify structure (keys are normalized emails from assignee)
+            self.assertIn('john.doe@company.com', engineer_data)
+            self.assertIn('weeks', engineer_data['john.doe@company.com'])
+            self.assertIn('2025-04-07', engineer_data['john.doe@company.com']['weeks'])
             
-            week_data = engineer_data['john.doe']['weeks']['2025-04-07']
+            week_data = engineer_data['john.doe@company.com']['weeks']['2025-04-07']
             self.assertIn('github', week_data)
             self.assertIn('jira', week_data)
 
