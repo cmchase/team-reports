@@ -472,6 +472,69 @@ def cycle_and_lead_from_issue(
         return (None, None)
 
 
+def time_in_state_from_issue(
+    issue: Any,
+    execution_statuses: List[str],
+    completed_statuses: List[str],
+) -> Optional[Dict[str, float]]:
+    """
+    Compute days spent in each execution state between first execution and first done.
+    Returns status name -> total days in that state (e.g. {"In Progress": 2.5, "Review": 4.0}),
+    or None if changelog missing or cycle not computable.
+    """
+    try:
+        changelog = getattr(issue, "changelog", None)
+        if not changelog or not getattr(changelog, "histories", None):
+            return None
+        histories = sorted(changelog.histories, key=lambda h: h.created)
+        transitions: List[Tuple[datetime, str]] = []
+        first_execution = None
+        first_done = None
+        for history in histories:
+            for item in getattr(history, "items", []):
+                if getattr(item, "field", None) != "status":
+                    continue
+                to_str = (getattr(item, "toString", None) or "").strip()
+                if not to_str:
+                    continue
+                try:
+                    created_time = datetime.strptime(history.created[:19], "%Y-%m-%dT%H:%M:%S")
+                except ValueError:
+                    continue
+                transitions.append((created_time, to_str))
+                if to_str in execution_statuses and first_execution is None:
+                    first_execution = created_time
+                if to_str in completed_statuses and first_done is None:
+                    first_done = created_time
+        if first_execution is None or first_done is None or first_done <= first_execution:
+            return None
+        time_in_state: Dict[str, float] = {s: 0.0 for s in execution_statuses}
+        current_state: Optional[str] = None
+        entered_at: Optional[datetime] = None
+        for time, to_str in transitions:
+            if time < first_execution:
+                continue
+            if time == first_execution and current_state is None:
+                current_state = to_str
+                entered_at = time
+                continue
+            if time > first_done:
+                break
+            if current_state is not None and entered_at is not None and current_state in execution_statuses:
+                seg_days = (time - entered_at).total_seconds() / (24 * 3600)
+                if seg_days > 0:
+                    time_in_state[current_state] = time_in_state.get(current_state, 0) + seg_days
+            current_state = to_str
+            entered_at = time
+        if current_state is not None and entered_at is not None and current_state in execution_statuses and entered_at < first_done:
+            seg_days = (first_done - entered_at).total_seconds() / (24 * 3600)
+            if seg_days > 0:
+                time_in_state[current_state] = time_in_state.get(current_state, 0) + seg_days
+        return time_in_state
+    except Exception:
+        return None
+
+
 def fetch_flow_issues(
     jira_client: JIRA, jql: str, max_issues: int
 ) -> Tuple[int, List[Any]]:

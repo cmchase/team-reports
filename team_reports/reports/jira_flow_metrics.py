@@ -16,6 +16,7 @@ from team_reports.utils.jira import (
     flow_stats,
     cycle_and_lead_from_issue,
     format_duration_days,
+    time_in_state_from_issue,
 )
 from team_reports.utils.jira_summary_base import JiraSummaryBase
 
@@ -270,6 +271,7 @@ class JiraFlowMetricsReport(JiraSummaryBase):
         segment_issuetype: Dict[str, List[Tuple[Optional[float], Optional[float]]]] = {}
         segment_component: Dict[str, List[Tuple[Optional[float], Optional[float]]]] = {}
         segment_size: Dict[str, List[Tuple[Optional[float], Optional[float]]]] = {}
+        time_in_state_lists: Dict[str, List[float]] = {s: [] for s in execution_statuses}
         for issue in issues:
             cycle_days, lead_days = cycle_and_lead_from_issue(
                 issue, execution_statuses, completed_statuses
@@ -287,6 +289,12 @@ class JiraFlowMetricsReport(JiraSummaryBase):
                 cycle_days_list.append(cycle_days)
             if lead_days is not None:
                 lead_days_list.append(lead_days)
+            if cycle_days is not None:
+                tis = time_in_state_from_issue(issue, execution_statuses, completed_statuses)
+                if tis:
+                    for state, days in tis.items():
+                        if state in time_in_state_lists and days > 0:
+                            time_in_state_lists[state].append(days)
             if cycle_days is not None or lead_days is not None:
                 if "issuetype" in segment_by:
                     it = getattr(issue.fields, "issuetype", None)
@@ -426,6 +434,20 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             if cycle_target is not None and cycle_stats["count"] > 0:
                 met = cycle_stats["median"] <= cycle_target
                 lines.append(f"- Target: cycle median < {format_duration_days(float(cycle_target))} → Actual: {format_duration_days(cycle_stats['median'])} {'✓' if met else '✗'}")
+        # Time in state (execution): In Progress vs Review etc.
+        states_with_data = [(s, time_in_state_lists[s]) for s in execution_statuses if time_in_state_lists[s]]
+        if states_with_data:
+            lines.extend(["", "### Time in state (execution)", ""])
+            medians_by_state: List[Tuple[str, float]] = []
+            for state, vals in states_with_data:
+                st = flow_stats(vals)
+                lines.append(f"- **{state}:** median {format_duration_days(st['median'])}, avg {format_duration_days(st['avg'])}")
+                medians_by_state.append((state, st["median"]))
+            if len(medians_by_state) >= 2:
+                medians_by_state.sort(key=lambda x: x[1], reverse=True)
+                if medians_by_state[0][1] > 0 and medians_by_state[1][1] > 0 and medians_by_state[0][1] > medians_by_state[1][1] * 1.2:
+                    lines.append(f"- *Most cycle time is in {medians_by_state[0][0]}.*")
+            lines.append("")
         lines.extend([
             "",
             "### Lead time (created → done)",
