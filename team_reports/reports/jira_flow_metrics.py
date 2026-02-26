@@ -6,8 +6,11 @@ Uses Jira issues resolved in a date range; cycle = first execution status -> com
 lead = created -> completed. Reads status_filters (execution, completed) from Jira config.
 """
 
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from team_reports.reports import flow_metrics_history
 from team_reports.utils.jira import (
     fetch_flow_issues,
     flow_stats,
@@ -51,8 +54,16 @@ class JiraFlowMetricsReport(JiraSummaryBase):
         cycle_stats: Dict[str, float],
         lead_stats: Dict[str, float],
         total_throughput: int,
+        prev_period: Optional[Dict[str, Any]] = None,
     ) -> str:
         """One short suggested focus line from heuristics."""
+        if prev_period is not None:
+            prev_cycle = prev_period.get("cycle_median_days")
+            prev_lead = prev_period.get("lead_median_days")
+            if prev_cycle is not None and cycle_stats.get("median") is not None and cycle_stats["median"] < prev_cycle:
+                return "Celebrate: cycle time improved vs last period."
+            if prev_lead is not None and lead_stats.get("median") is not None and lead_stats["median"] < prev_lead:
+                return "Celebrate: lead time improved vs last period."
         if cycle_stats.get("std_dev", 0) > 14:
             return "Review items with cycle time > 3 weeks."
         if lead_stats.get("std_dev", 0) > 30:
@@ -60,6 +71,91 @@ class JiraFlowMetricsReport(JiraSummaryBase):
         if total_throughput < 15:
             return "Understand throughput (low completion count this period)."
         return "Keep cycle and lead predictable; consider retro on slowest items."
+
+    def _what_this_means(
+        self,
+        total_throughput: int,
+        cycle_stats: Dict[str, float],
+        lead_stats: Dict[str, float],
+        prev_period: Optional[Dict[str, Any]],
+        rolling: Optional[Dict[str, Any]],
+    ) -> List[str]:
+        """2–3 bullets summarizing vs previous period and rolling when available."""
+        bullets = []
+        if prev_period is not None:
+            prev_t = prev_period.get("throughput")
+            if prev_t is not None:
+                if total_throughput > int(prev_t):
+                    bullets.append("Throughput up vs last period.")
+                elif total_throughput < int(prev_t):
+                    bullets.append("Throughput down vs last period.")
+            prev_cycle = prev_period.get("cycle_median_days")
+            if prev_cycle is not None and cycle_stats.get("median") is not None:
+                if cycle_stats["median"] < prev_cycle:
+                    bullets.append("Cycle time improved vs last period.")
+                elif cycle_stats["median"] > prev_cycle:
+                    bullets.append("Cycle time higher than last period; review execution flow.")
+            prev_lead = prev_period.get("lead_median_days")
+            if prev_lead is not None and lead_stats.get("median") is not None:
+                if lead_stats["median"] > prev_lead:
+                    bullets.append("Lead time higher than last period; review backlog age.")
+        if rolling is not None and len(bullets) < 3:
+            bullets.append(f"Throughput in range of last {rolling.get('periods', 3)} periods (rolling avg: {rolling.get('throughput', 0):.0f}).")
+        if not bullets:
+            bullets.append("Run again next period to see trends.")
+        return bullets[:3]
+
+    def _trend_lines(
+        self,
+        total_throughput: int,
+        cycle_stats: Dict[str, float],
+        lead_stats: Dict[str, float],
+        targets: Dict[str, Any],
+        prev_period: Optional[Dict[str, Any]],
+    ) -> List[str]:
+        """Traffic-light: improving / stable / worsening vs previous period and targets."""
+        lines = []
+        # Throughput
+        if prev_period is not None and prev_period.get("throughput") is not None:
+            prev_t = int(prev_period["throughput"])
+            if total_throughput > prev_t:
+                lines.append(f"Throughput: {total_throughput} ✓ improving")
+            elif total_throughput < prev_t:
+                lines.append(f"Throughput: {total_throughput} ↓ worsening")
+            else:
+                lines.append(f"Throughput: {total_throughput} → stable")
+        throughput_min = targets.get("throughput_min")
+        if throughput_min is not None:
+            lines.append(f"Throughput target ≥{throughput_min}: {'✓' if total_throughput >= throughput_min else '✗'}")
+        # Cycle median
+        if cycle_stats.get("count", 0) > 0 and cycle_stats.get("median") is not None:
+            med = cycle_stats["median"]
+            if prev_period is not None and prev_period.get("cycle_median_days") is not None:
+                prev_c = prev_period["cycle_median_days"]
+                if med < prev_c:
+                    lines.append(f"Cycle median: {format_duration_days(med)} ✓ improving")
+                elif med > prev_c:
+                    lines.append(f"Cycle median: {format_duration_days(med)} ↓ worsening")
+                else:
+                    lines.append(f"Cycle median: {format_duration_days(med)} → stable")
+            cycle_target = targets.get("cycle_median_days")
+            if cycle_target is not None:
+                lines.append(f"Cycle median target: {'✓' if med <= cycle_target else '✗'}")
+        # Lead median
+        if lead_stats.get("count", 0) > 0 and lead_stats.get("median") is not None:
+            med = lead_stats["median"]
+            if prev_period is not None and prev_period.get("lead_median_days") is not None:
+                prev_l = prev_period["lead_median_days"]
+                if med < prev_l:
+                    lines.append(f"Lead median: {format_duration_days(med)} ✓ improving")
+                elif med > prev_l:
+                    lines.append(f"Lead median: {format_duration_days(med)} ↓ worsening")
+                else:
+                    lines.append(f"Lead median: {format_duration_days(med)} → stable")
+            lead_target = targets.get("lead_median_days")
+            if lead_target is not None:
+                lines.append(f"Lead median target: {'✓' if med <= lead_target else '✗'}")
+        return lines
 
     def _suggested_actions(
         self,
@@ -76,9 +172,24 @@ class JiraFlowMetricsReport(JiraSummaryBase):
         actions.append("Use next flow report to track trends.")
         return actions
 
+    def _infer_cadence(self, period_days: int) -> str:
+        """Infer cadence from period length; 28-31 → monthly, 12-16 → bi-weekly."""
+        if 28 <= period_days <= 31:
+            return "monthly"
+        if 12 <= period_days <= 16:
+            return "bi-weekly"
+        return (self._get_flow_config().get("cadence")) or "custom"
+
+    def _resolve_history_path(self, history_file: str) -> str:
+        """Resolve relative path from cwd so Reports/... works when run from repo root."""
+        p = Path(history_file)
+        if p.is_absolute():
+            return history_file
+        return str(Path.cwd() / p)
+
     def _next_report_date(self, end_date: str, cadence: str) -> str:
         """Compute next report date from period end and cadence."""
-        from datetime import datetime, timedelta
+        from datetime import timedelta
         try:
             end_dt = datetime.strptime(end_date, "%Y-%m-%d")
         except ValueError:
@@ -150,6 +261,25 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             )
         flow_cfg = self._get_flow_config()
         targets = flow_cfg.get("targets") or {}
+
+        # Period length and cadence for history
+        try:
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+            period_days = max(0, (end_dt - start_dt).days + 1)
+        except ValueError:
+            period_days = 0
+        cadence = self._infer_cadence(period_days)
+
+        # Load history for comparison (before appending this run)
+        prev_period: Optional[Dict[str, Any]] = None
+        rolling: Optional[Dict[str, Any]] = None
+        history_path: Optional[str] = None
+        if flow_cfg.get("history_file"):
+            history_path = self._resolve_history_path(flow_cfg["history_file"])
+            history = flow_metrics_history.load_flow_metrics_history(history_path)
+            prev_period = flow_metrics_history.get_previous_period(history, period_days, cadence)
+            rolling = flow_metrics_history.get_rolling(history, cadence, periods=3)
         throughput_min = targets.get("throughput_min")
         if throughput_min is not None:
             met = total_throughput >= throughput_min
@@ -159,9 +289,41 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             "## Flow metrics",
             f"**Period:** {start_date} to {end_date}",
             f"**Throughput:** {throughput_note} issues completed",
-            "",
         ]
-        focus = self._focus_suggestion(cycle_stats, lead_stats, total_throughput)
+        if prev_period is not None:
+            prev_t = prev_period.get("throughput")
+            if prev_t is not None:
+                diff = total_throughput - int(prev_t)
+                if diff > 0:
+                    vs = f"*(vs last period: {int(prev_t)} → ↑ {diff})*"
+                elif diff < 0:
+                    vs = f"*(vs last period: {int(prev_t)} → ↓ {abs(diff)})*"
+                else:
+                    vs = "*(vs last period: same)*"
+                lines.append(vs)
+        lines.append("")
+
+        # What this means (2–3 bullets using prev and rolling)
+        what_bullets = self._what_this_means(
+            total_throughput, cycle_stats, lead_stats, prev_period, rolling
+        )
+        if what_bullets:
+            lines.append("**What this means:**")
+            for b in what_bullets:
+                lines.append(f"- {b}")
+            lines.append("")
+
+        # Traffic-light / trend
+        trend_lines = self._trend_lines(
+            total_throughput, cycle_stats, lead_stats, targets, prev_period
+        )
+        if trend_lines:
+            lines.append("**Trend:**")
+            for t in trend_lines:
+                lines.append(f"- {t}")
+            lines.append("")
+
+        focus = self._focus_suggestion(cycle_stats, lead_stats, total_throughput, prev_period)
         lines.append(f"**Suggested focus:** {focus}")
         lines.extend([
             "",
@@ -175,7 +337,17 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             )
         else:
             lines.append(f"- **Average:** {format_duration_days(cycle_stats['avg'])}")
-            lines.append(f"- **Median:** {format_duration_days(cycle_stats['median'])}")
+            med_line = f"- **Median:** {format_duration_days(cycle_stats['median'])}"
+            if prev_period is not None and prev_period.get("cycle_median_days") is not None:
+                prev_c = prev_period["cycle_median_days"]
+                curr = cycle_stats["median"]
+                if curr < prev_c:
+                    med_line += f" *(↓ from {format_duration_days(prev_c)} last period)*"
+                elif curr > prev_c:
+                    med_line += f" *(↑ from {format_duration_days(prev_c)} last period)*"
+                else:
+                    med_line += " *(same as last period)*"
+            lines.append(med_line)
             lines.append(
                 f"- **Min:** {format_duration_days(cycle_stats['min'])} | **Max:** {format_duration_days(cycle_stats['max'])}"
             )
@@ -204,7 +376,17 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             lines.append("No lead time data.")
         else:
             lines.append(f"- **Average:** {format_duration_days(lead_stats['avg'])}")
-            lines.append(f"- **Median:** {format_duration_days(lead_stats['median'])}")
+            med_line = f"- **Median:** {format_duration_days(lead_stats['median'])}"
+            if prev_period is not None and prev_period.get("lead_median_days") is not None:
+                prev_l = prev_period["lead_median_days"]
+                curr = lead_stats["median"]
+                if curr < prev_l:
+                    med_line += f" *(↓ from {format_duration_days(prev_l)} last period)*"
+                elif curr > prev_l:
+                    med_line += f" *(↑ from {format_duration_days(prev_l)} last period)*"
+                else:
+                    med_line += " *(same as last period)*"
+            lines.append(med_line)
             lines.append(
                 f"- **Min:** {format_duration_days(lead_stats['min'])} | **Max:** {format_duration_days(lead_stats['max'])}"
             )
@@ -221,6 +403,17 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             if lead_target is not None and lead_stats["count"] > 0:
                 met = lead_stats["median"] <= lead_target
                 lines.append(f"- Target: lead median < {format_duration_days(float(lead_target))} → Actual: {format_duration_days(lead_stats['median'])} {'✓' if met else '✗'}")
+
+        # Rolling (3 periods) when history available
+        if rolling is not None:
+            lines.extend([
+                "",
+                "### Rolling (3 periods)",
+                f"- **Throughput (avg):** {rolling.get('throughput', 0):.0f}",
+                f"- **Cycle median (avg):** {format_duration_days(rolling.get('cycle_median_days', 0))}",
+                f"- **Lead median (avg):** {format_duration_days(rolling.get('lead_median_days', 0))}",
+                "",
+            ])
 
         # Outliers: slowest by cycle and by lead (computed for Suggested actions and Slowest items section)
         by_cycle = [r for r in issue_records if r["cycle_days"] is not None]
@@ -272,4 +465,27 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             "*Throughput = all issues matching base_jql + completed status + resolution date in period. Tighten base_jql in config to scope to one team or board.*",
             "*Cycle/lead use config status_filters (execution, completed). Kanban-friendly; review weekly, monthly, or quarterly for trends.*",
         ])
+
+        # Append this period to history for next run's comparison
+        if history_path:
+            record = {
+                "period_start": start_date,
+                "period_end": end_date,
+                "period_days": period_days,
+                "cadence": cadence,
+                "throughput": total_throughput,
+                "cycle_median_days": cycle_stats.get("median"),
+                "cycle_avg_days": cycle_stats.get("avg"),
+                "cycle_std_days": cycle_stats.get("std_dev"),
+                "cycle_p95_days": cycle_stats.get("p95"),
+                "lead_median_days": lead_stats.get("median"),
+                "lead_avg_days": lead_stats.get("avg"),
+                "lead_std_days": lead_stats.get("std_dev"),
+                "lead_p95_days": lead_stats.get("p95"),
+                "cycle_n": int(cycle_stats.get("count", 0)),
+                "lead_n": int(lead_stats.get("count", 0)),
+            }
+            max_entries = flow_cfg.get("history_max_entries_per_cadence", 24)
+            flow_metrics_history.append_flow_metrics_record(history_path, record, max_per_cadence=max_entries)
+
         return "\n".join(lines)

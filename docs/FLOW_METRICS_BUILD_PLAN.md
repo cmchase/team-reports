@@ -15,10 +15,10 @@ Execute tasks in order. Each task lists **Files**, **Steps**, and **Verify**. Re
 | 1 | 1.5 Focus suggestion heuristic | ✅ |
 | 1 | 1.6 Targets + target line + Next report date | ✅ |
 | 1 | 1.7 Suggested actions (short checklist) | ✅ |
-| 2 | 2.1 History schema + load/save helpers | ⬜ |
-| 2 | 2.2 Write history after each run; infer cadence | ⬜ |
-| 2 | 2.3 "Vs last period" + rolling averages in report | ⬜ |
-| 2 | 2.4 Traffic-light / trend; "What this means" with comparison | ⬜ |
+| 2 | 2.1 History schema + load/save helpers | ✅ |
+| 2 | 2.2 Write history after each run; infer cadence | ✅ |
+| 2 | 2.3 "Vs last period" + rolling averages in report | ✅ |
+| 2 | 2.4 Traffic-light / trend; "What this means" with comparison | ✅ |
 | 3 | 3.1 Segment by issue type (and optional component) | ⬜ |
 | 3 | 3.2 Optional story points + cycle by size | ⬜ |
 | 3 | 3.3 WIP count query + line in report | ⬜ |

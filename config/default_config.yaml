@@ -87,8 +87,8 @@ flow_metrics:
     cycle_median_days: null   # e.g. 10 for "under 1.5 weeks"
     lead_median_days: null    # e.g. 21 for "under 3 weeks"
     throughput_min: null      # e.g. 20
-  # Phase 2: history_file: "Reports/flow_metrics_history.json"
-  # Phase 2: history_max_entries_per_cadence: 24
+  history_file: "Reports/flow_metrics_history.json"
+  history_max_entries_per_cadence: 24
   # Phase 3: segment_by: ["issuetype"]
   # Phase 3: story_points_field: null
   # Phase 3: wip_query: true
