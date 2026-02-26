@@ -211,6 +211,28 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             lines.append(f"| {key} | {n} | {format_duration_days(cycle_med)} | {format_duration_days(lead_med)} |")
         return lines
 
+    def _classify_slowest_item(
+        self,
+        summary: str,
+        key: str,
+        cycle_days: Optional[float],
+        lead_days: Optional[float],
+        by_lead: bool,
+    ) -> str:
+        """Classify slowest item by failure mode from title/summary. Default: Unknown: needs manual review."""
+        s = (summary or "").lower()
+        if any(x in s for x in ["cve", "weakness", "sar", "embargo", "security", "compliance"]):
+            return "Security/compliance work"
+        if any(x in s for x in ["embargo", "partner", "waiting on", "another team", "external", "dependency"]):
+            return "External dependency"
+        if any(x in s for x in ["spike", "prototype", "architectural", "architecture", "scope"]):
+            return "Scope grew during execution"
+        if any(x in s for x in ["build", "pipeline", "ci ", "installer", "packaging", "tooling", "infrastructure"]):
+            return "Infrastructure/tooling"
+        if by_lead and lead_days is not None and lead_days > 90 and (cycle_days is None or cycle_days < 30):
+            return "Backlog age"
+        return "Unknown: needs manual review"
+
     def _next_report_date(self, end_date: str, cadence: str) -> str:
         """Compute next report date from period end and cadence."""
         from datetime import timedelta
@@ -263,9 +285,21 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             self.jira_client.jira_client, jql, max_issues
         )
 
+        try:
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+        except ValueError:
+            start_dt = None
+            end_dt = None
+
         issue_records: List[Dict[str, Any]] = []
         cycle_days_list: List[float] = []
         lead_days_list: List[float] = []
+        lead_days_new_work: List[float] = []
+        lead_days_aged_backlog: List[float] = []
+        active_days_list: List[float] = []
+        cycle_days_for_efficiency: List[float] = []
+        has_created_dates = True
         segment_by = flow_cfg.get("segment_by") or []
         story_points_field = flow_cfg.get("story_points_field")
         segment_issuetype: Dict[str, List[Tuple[Optional[float], Optional[float]]]] = {}
@@ -289,9 +323,25 @@ class JiraFlowMetricsReport(JiraSummaryBase):
                 cycle_days_list.append(cycle_days)
             if lead_days is not None:
                 lead_days_list.append(lead_days)
+                if start_dt is not None:
+                    created_str = getattr(issue.fields, "created", None) or ""
+                    if created_str:
+                        try:
+                            created_dt = datetime.strptime(created_str[:10], "%Y-%m-%d")
+                            if created_dt >= start_dt:
+                                lead_days_new_work.append(lead_days)
+                            else:
+                                lead_days_aged_backlog.append(lead_days)
+                        except (ValueError, TypeError):
+                            has_created_dates = False
+                    else:
+                        has_created_dates = False
             if cycle_days is not None:
                 tis = time_in_state_from_issue(issue, execution_statuses, completed_statuses)
                 if tis:
+                    total_active = sum(tis.values())
+                    active_days_list.append(total_active)
+                    cycle_days_for_efficiency.append(cycle_days)
                     for state, days in tis.items():
                         if state in time_in_state_lists and days > 0:
                             time_in_state_lists[state].append(days)
@@ -340,12 +390,16 @@ class JiraFlowMetricsReport(JiraSummaryBase):
         # Load history for comparison (before appending this run)
         prev_period: Optional[Dict[str, Any]] = None
         rolling: Optional[Dict[str, Any]] = None
+        last_3_records: List[Dict[str, Any]] = []
         history_path: Optional[str] = None
         if flow_cfg.get("history_file"):
             history_path = self._resolve_history_path(flow_cfg["history_file"])
             history = flow_metrics_history.load_flow_metrics_history(history_path)
             prev_period = flow_metrics_history.get_previous_period(history, period_days, cadence)
             rolling = flow_metrics_history.get_rolling(history, cadence, periods=3)
+            norm = cadence if cadence in ("monthly", "bi-weekly", "custom") else self._infer_cadence(period_days)
+            same_cadence = [r for r in history if (r.get("cadence") or self._infer_cadence(r.get("period_days", 0))) == norm]
+            last_3_records = same_cadence[-3:] if same_cadence else []
         throughput_min = targets.get("throughput_min")
         if throughput_min is not None:
             met = total_throughput >= throughput_min
@@ -358,6 +412,21 @@ class JiraFlowMetricsReport(JiraSummaryBase):
         ]
         if wip_count is not None:
             lines.append(f"**Current WIP (in execution):** {wip_count} issues. *WIP is as of report generation.*")
+        lines.append("")
+        lines.append("**WIP snapshot**")
+        if wip_count is not None and total_throughput > 0:
+            wip_ratio = wip_count / total_throughput
+            lines.append(f"- WIP-to-throughput ratio: {wip_ratio:.1f} (current WIP ÷ throughput this period).")
+            if wip_ratio > 1.5:
+                lines.append("- *Interpretation: flow may be queued; consider reducing WIP.*")
+            else:
+                lines.append("- *Interpretation: healthy range.*")
+        else:
+            if wip_count is None:
+                lines.append("- *Enable flow_metrics.wip_query in config to see current WIP and ratio.*")
+        lines.append("- // TODO: Average WIP during period: requires daily or period-level execution-status snapshot.")
+        lines.append("- // TODO: Peak WIP: requires single-day counts or changelog replay by day.")
+        lines.append("")
         if prev_period is not None:
             prev_t = prev_period.get("throughput")
             if prev_t is not None:
@@ -434,6 +503,32 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             if cycle_target is not None and cycle_stats["count"] > 0:
                 met = cycle_stats["median"] <= cycle_target
                 lines.append(f"- Target: cycle median < {format_duration_days(float(cycle_target))} → Actual: {format_duration_days(cycle_stats['median'])} {'✓' if met else '✗'}")
+        # Cycle time distribution
+        if cycle_days_list:
+            under_7 = sum(1 for d in cycle_days_list if d < 7)
+            w1_w2 = sum(1 for d in cycle_days_list if 7 <= d < 14)
+            w2_w4 = sum(1 for d in cycle_days_list if 14 <= d < 28)
+            over_28 = sum(1 for d in cycle_days_list if d >= 28)
+            n_cycle = len(cycle_days_list)
+            pct_under_7 = round(100 * under_7 / n_cycle, 1) if n_cycle else 0
+            pct_w1_w2 = round(100 * w1_w2 / n_cycle, 1) if n_cycle else 0
+            pct_w2_w4 = round(100 * w2_w4 / n_cycle, 1) if n_cycle else 0
+            pct_over_28 = round(100 * over_28 / n_cycle, 1) if n_cycle else 0
+            pct_within_2w = pct_under_7 + pct_w1_w2
+            lines.extend([
+                "",
+                "### Cycle time distribution",
+                "",
+                f"- Under 1 week: {under_7} ({pct_under_7}%)",
+                f"- 1–2 weeks: {w1_w2} ({pct_w1_w2}%)",
+                f"- 2–4 weeks: {w2_w4} ({pct_w2_w4}%)",
+                f"- Over 4 weeks: {over_28} ({pct_over_28}%)",
+                f"- *{pct_within_2w}% of issues completed within 2 weeks (target: >= 70%).*",
+            ])
+            long_tail_n = sum(1 for d in cycle_days_list if d > 56)
+            if long_tail_n > 0:
+                lines.append(f"- *Long-tail alert: {long_tail_n} issue(s) exceeded 8 weeks. These represent a system problem worth diagnosing, not just noting.*")
+            lines.append("")
         # Time in state (execution): In Progress vs Review etc.
         states_with_data = [(s, time_in_state_lists[s]) for s in execution_statuses if time_in_state_lists[s]]
         if states_with_data:
@@ -447,6 +542,17 @@ class JiraFlowMetricsReport(JiraSummaryBase):
                 medians_by_state.sort(key=lambda x: x[1], reverse=True)
                 if medians_by_state[0][1] > 0 and medians_by_state[1][1] > 0 and medians_by_state[0][1] > medians_by_state[1][1] * 1.2:
                     lines.append(f"- *Most cycle time is in {medians_by_state[0][0]}.*")
+            if active_days_list and cycle_days_for_efficiency:
+                total_active = sum(active_days_list)
+                total_cycle = sum(cycle_days_for_efficiency)
+                efficiency = (total_active / total_cycle * 100) if total_cycle > 0 else 0
+                lines.append(f"- **Flow efficiency:** {efficiency:.0f}% (active execution vs. total cycle time).")
+                if efficiency >= 60:
+                    lines.append("- *Interpretation: good.*")
+                elif efficiency >= 40:
+                    lines.append("- *Interpretation: moderate; investigate wait states.*")
+                else:
+                    lines.append("- *Interpretation: low; significant queue or blocking time present.*")
             lines.append("")
         lines.extend([
             "",
@@ -485,6 +591,23 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             if lead_target is not None and lead_stats["count"] > 0:
                 met = lead_stats["median"] <= lead_target
                 lines.append(f"- Target: lead median < {format_duration_days(float(lead_target))} → Actual: {format_duration_days(lead_stats['median'])} {'✓' if met else '✗'}")
+            if has_created_dates and (lead_days_new_work or lead_days_aged_backlog):
+                lines.extend(["", "#### Lead time: new work (created this period)", ""])
+                if lead_days_new_work:
+                    nw_stats = flow_stats(lead_days_new_work)
+                    lines.append(f"- Count: {len(lead_days_new_work)} | Median: {format_duration_days(nw_stats['median'])} | Average: {format_duration_days(nw_stats['avg'])}")
+                else:
+                    lines.append("- Count: 0 (no issues created and completed in this period).")
+                lines.extend(["", "#### Lead time: aged backlog (created before this period)", ""])
+                if lead_days_aged_backlog:
+                    ab_stats = flow_stats(lead_days_aged_backlog)
+                    lines.append(f"- Count: {len(lead_days_aged_backlog)} | Median: {format_duration_days(ab_stats['median'])} | Average: {format_duration_days(ab_stats['avg'])}")
+                    lines.append("- *High median here reflects backlog age, not execution speed.*")
+                else:
+                    lines.append("- Count: 0.")
+            elif not has_created_dates:
+                lines.append("")
+                lines.append("// TODO: creation date segmentation requires created date field in source data")
 
         # Segment tables (Cycle by issue type, by component, by size)
         if "issuetype" in segment_by and segment_issuetype:
@@ -501,16 +624,43 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             lines.extend(self._segment_table(segment_size, order_keys=size_order, first_column="Size"))
             lines.append("")
 
-        # Rolling (3 periods) when history available
+        # Rolling (3 periods) when history available — interpreted trend
         if rolling is not None:
-            lines.extend([
-                "",
-                "### Rolling (3 periods)",
-                f"- **Throughput (avg):** {rolling.get('throughput', 0):.0f}",
-                f"- **Cycle median (avg):** {format_duration_days(rolling.get('cycle_median_days', 0))}",
-                f"- **Lead median (avg):** {format_duration_days(rolling.get('lead_median_days', 0))}",
-                "",
-            ])
+            lines.extend(["", "### Rolling trend (3-period)", ""])
+            tp_avg = rolling.get("throughput", 0)
+            cy_avg = rolling.get("cycle_median_days", 0)
+            ld_avg = rolling.get("lead_median_days", 0)
+            tp_dir = "Stable"
+            cy_dir = "Stable"
+            ld_dir = "Stable"
+            if len(last_3_records) >= 3:
+                v1_t, v2_t, v3_t = [r.get("throughput", 0) for r in last_3_records[-3:]]
+                if v3_t > v2_t > v1_t:
+                    tp_dir = "Trending up"
+                elif v3_t < v2_t < v1_t:
+                    tp_dir = "Trending down"
+                v1_c, v2_c, v3_c = [r.get("cycle_median_days") or 0 for r in last_3_records[-3:]]
+                if v3_c < v2_c < v1_c:
+                    cy_dir = "Improving"
+                elif v3_c > v2_c > v1_c:
+                    cy_dir = "Degrading"
+                v1_l, v2_l, v3_l = [r.get("lead_median_days") or 0 for r in last_3_records[-3:]]
+                if v3_l < v2_l < v1_l:
+                    ld_dir = "Improving"
+                elif v3_l > v2_l > v1_l:
+                    ld_dir = "Degrading"
+            lines.append(f"- Throughput: {tp_avg:.0f} — {tp_dir}")
+            lines.append(f"- Cycle median: {format_duration_days(cy_avg)} — {cy_dir}")
+            lines.append(f"- Lead median: {format_duration_days(ld_avg)} — {ld_dir}")
+            degrading_count = sum(1 for d in [tp_dir == "Trending down", cy_dir == "Degrading", ld_dir == "Degrading"] if d)
+            if degrading_count >= 2:
+                health = "At risk"
+            elif degrading_count == 1:
+                health = "Watch"
+            else:
+                health = "Healthy"
+            lines.append(f"- *Overall flow health: {health}*")
+            lines.append("")
 
         # Outliers: slowest by cycle and by lead (computed for Suggested actions and Slowest items section)
         by_cycle = [r for r in issue_records if r["cycle_days"] is not None]
@@ -540,6 +690,8 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             for r in by_cycle[:3]:
                 link = f"[{r['key']}]({server_url}/browse/{r['key']})" if server_url else r["key"]
                 lines.append(f"- {link} — {r['summary']} — {format_duration_days(r['cycle_days'])}")
+                typ = self._classify_slowest_item(r["summary"], r["key"], r.get("cycle_days"), r.get("lead_days"), by_lead=False)
+                lines.append(f"  Type: {typ}")
         else:
             lines.append("**By cycle time:** No cycle time outliers.")
         if by_lead:
@@ -547,8 +699,20 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             for r in by_lead[:3]:
                 link = f"[{r['key']}]({server_url}/browse/{r['key']})" if server_url else r["key"]
                 lines.append(f"- {link} — {r['summary']} — {format_duration_days(r['lead_days'])}")
+                typ = self._classify_slowest_item(r["summary"], r["key"], r.get("cycle_days"), r.get("lead_days"), by_lead=True)
+                lines.append(f"  Type: {typ}")
         else:
             lines.append("**By lead time:** No lead time data.")
+
+        # Active WIP aging (open at period end)
+        lines.extend([
+            "",
+            "### Active WIP aging (open at period end)",
+            "",
+            "// TODO: active WIP aging requires open issue snapshot at period end date",
+            "*This would list issues in In Progress or Review at the end of the period, grouped by how long they have been in that state.*",
+            "",
+        ])
 
         # Definitions (glossary)
         lines.extend([
