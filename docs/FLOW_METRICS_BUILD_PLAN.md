@@ -19,9 +19,9 @@ Execute tasks in order. Each task lists **Files**, **Steps**, and **Verify**. Re
 | 2 | 2.2 Write history after each run; infer cadence | ✅ |
 | 2 | 2.3 "Vs last period" + rolling averages in report | ✅ |
 | 2 | 2.4 Traffic-light / trend; "What this means" with comparison | ✅ |
-| 3 | 3.1 Segment by issue type (and optional component) | ⬜ |
-| 3 | 3.2 Optional story points + cycle by size | ⬜ |
-| 3 | 3.3 WIP count query + line in report | ⬜ |
+| 3 | 3.1 Segment by issue type (and optional component) | ✅ |
+| 3 | 3.2 Optional story points + cycle by size | ✅ |
+| 3 | 3.3 WIP count query + line in report | ✅ |
 
 ---
 

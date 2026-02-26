@@ -8,7 +8,7 @@ lead = created -> completed. Reads status_filters (execution, completed) from Ji
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from team_reports.reports import flow_metrics_history
 from team_reports.utils.jira import (
@@ -187,6 +187,29 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             return history_file
         return str(Path.cwd() / p)
 
+    def _segment_table(
+        self,
+        segment_map: Dict[str, List[Tuple[Optional[float], Optional[float]]]],
+        order_keys: Optional[List[str]] = None,
+        first_column: str = "Type",
+    ) -> List[str]:
+        """Build markdown table lines: first_column | Count | Median cycle | Median lead."""
+        if not segment_map:
+            return []
+        lines = [f"| {first_column} | Count | Median cycle | Median lead |", "| --- | --- | --- | --- |"]
+        keys = order_keys if order_keys is not None else sorted(segment_map.keys())
+        for key in keys:
+            if key not in segment_map:
+                continue
+            pairs = segment_map[key]
+            cycle_vals = [p[0] for p in pairs if p[0] is not None]
+            lead_vals = [p[1] for p in pairs if p[1] is not None]
+            n = len(pairs)
+            cycle_med = flow_stats(cycle_vals)["median"] if cycle_vals else 0.0
+            lead_med = flow_stats(lead_vals)["median"] if lead_vals else 0.0
+            lines.append(f"| {key} | {n} | {format_duration_days(cycle_med)} | {format_duration_days(lead_med)} |")
+        return lines
+
     def _next_report_date(self, end_date: str, cadence: str) -> str:
         """Compute next report date from period end and cadence."""
         from datetime import timedelta
@@ -227,6 +250,14 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             f'ORDER BY resolutiondate DESC'
         )
 
+        flow_cfg = self._get_flow_config()
+        wip_count: Optional[int] = None
+        if flow_cfg.get("wip_query"):
+            exec_jql = ", ".join(f'"{s}"' for s in execution_statuses)
+            wip_jql = f"({base_jql}) AND status IN ({exec_jql})"
+            wip_result = self.jira_client.jira_client.search_issues(wip_jql, maxResults=0)
+            wip_count = getattr(wip_result, "total", 0)
+
         total_throughput, issues = fetch_flow_issues(
             self.jira_client.jira_client, jql, max_issues
         )
@@ -234,6 +265,11 @@ class JiraFlowMetricsReport(JiraSummaryBase):
         issue_records: List[Dict[str, Any]] = []
         cycle_days_list: List[float] = []
         lead_days_list: List[float] = []
+        segment_by = flow_cfg.get("segment_by") or []
+        story_points_field = flow_cfg.get("story_points_field")
+        segment_issuetype: Dict[str, List[Tuple[Optional[float], Optional[float]]]] = {}
+        segment_component: Dict[str, List[Tuple[Optional[float], Optional[float]]]] = {}
+        segment_size: Dict[str, List[Tuple[Optional[float], Optional[float]]]] = {}
         for issue in issues:
             cycle_days, lead_days = cycle_and_lead_from_issue(
                 issue, execution_statuses, completed_statuses
@@ -251,6 +287,29 @@ class JiraFlowMetricsReport(JiraSummaryBase):
                 cycle_days_list.append(cycle_days)
             if lead_days is not None:
                 lead_days_list.append(lead_days)
+            if cycle_days is not None or lead_days is not None:
+                if "issuetype" in segment_by:
+                    it = getattr(issue.fields, "issuetype", None)
+                    it_name = it.name if it and hasattr(it, "name") else "Unknown"
+                    segment_issuetype.setdefault(it_name, []).append((cycle_days, lead_days))
+                if "component" in segment_by:
+                    comps = getattr(issue.fields, "components", None) or []
+                    comp_name = comps[0].name if comps and hasattr(comps[0], "name") else "No component"
+                    segment_component.setdefault(comp_name, []).append((cycle_days, lead_days))
+                if story_points_field:
+                    val = getattr(issue.fields, story_points_field, None)
+                    if val is None or (isinstance(val, (int, float)) and val == 0):
+                        bucket = "Unestimated"
+                    elif isinstance(val, (int, float)):
+                        if val <= 2:
+                            bucket = "Small"
+                        elif val <= 5:
+                            bucket = "Medium"
+                        else:
+                            bucket = "Large"
+                    else:
+                        bucket = "Unestimated"
+                    segment_size.setdefault(bucket, []).append((cycle_days, lead_days))
 
         cycle_stats = flow_stats(cycle_days_list)
         lead_stats = flow_stats(lead_days_list)
@@ -259,7 +318,6 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             throughput_note += (
                 f" (cycle/lead from first {len(issues)}; increase max_issues for full sample)"
             )
-        flow_cfg = self._get_flow_config()
         targets = flow_cfg.get("targets") or {}
 
         # Period length and cadence for history
@@ -290,6 +348,8 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             f"**Period:** {start_date} to {end_date}",
             f"**Throughput:** {throughput_note} issues completed",
         ]
+        if wip_count is not None:
+            lines.append(f"**Current WIP (in execution):** {wip_count} issues. *WIP is as of report generation.*")
         if prev_period is not None:
             prev_t = prev_period.get("throughput")
             if prev_t is not None:
@@ -403,6 +463,21 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             if lead_target is not None and lead_stats["count"] > 0:
                 met = lead_stats["median"] <= lead_target
                 lines.append(f"- Target: lead median < {format_duration_days(float(lead_target))} → Actual: {format_duration_days(lead_stats['median'])} {'✓' if met else '✗'}")
+
+        # Segment tables (Cycle by issue type, by component, by size)
+        if "issuetype" in segment_by and segment_issuetype:
+            lines.extend(["", "### Cycle by issue type", ""])
+            lines.extend(self._segment_table(segment_issuetype, first_column="Type"))
+            lines.append("")
+        if "component" in segment_by and segment_component:
+            lines.extend(["", "### Cycle by component", ""])
+            lines.extend(self._segment_table(segment_component, first_column="Component"))
+            lines.append("")
+        if story_points_field and segment_size:
+            size_order = ["Unestimated", "Small", "Medium", "Large"]
+            lines.extend(["", "### Cycle by size", ""])
+            lines.extend(self._segment_table(segment_size, order_keys=size_order, first_column="Size"))
+            lines.append("")
 
         # Rolling (3 periods) when history available
         if rolling is not None:
