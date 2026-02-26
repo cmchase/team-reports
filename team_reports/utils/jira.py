@@ -690,6 +690,32 @@ def wip_aging_at_date(
     return buckets
 
 
+def fetch_issues_resolved_after(
+    jira_client: JIRA,
+    base_jql: str,
+    after_date: str,
+    completed_statuses: List[str],
+    max_issues: int = 500,
+) -> List[Any]:
+    """
+    Fetch issues resolved after the given date (with changelog).
+    Used with execution-issues to compute full Active WIP aging at period end:
+    issues that were in execution at period end include both still-open and since-completed.
+    """
+    completed_jql = ", ".join(f'"{s}"' for s in completed_statuses)
+    jql = (
+        f"({base_jql}) AND status IN ({completed_jql}) "
+        f'AND resolutiondate > "{after_date}" ORDER BY resolutiondate ASC'
+    )
+    count_result = jira_client.search_issues(jql, maxResults=0)
+    total = getattr(count_result, "total", 0)
+    if total == 0:
+        return []
+    fetch_count = min(total, max_issues)
+    issues = jira_client.search_issues(jql, maxResults=fetch_count, expand="changelog")
+    return list(issues)
+
+
 def fetch_flow_issues(
     jira_client: JIRA, jql: str, max_issues: int
 ) -> Tuple[int, List[Any]]:

@@ -14,6 +14,7 @@ from team_reports.reports import flow_metrics_history
 from team_reports.utils.jira import (
     fetch_flow_issues,
     fetch_issues_in_execution,
+    fetch_issues_resolved_after,
     flow_stats,
     cycle_and_lead_from_issue,
     format_duration_days,
@@ -284,6 +285,7 @@ class JiraFlowMetricsReport(JiraSummaryBase):
         flow_cfg = self._get_flow_config()
         wip_count: Optional[int] = None
         execution_issues: List[Any] = []
+        resolved_after_issues: List[Any] = []
         avg_wip: Optional[float] = None
         peak_wip: Optional[int] = None
         if flow_cfg.get("wip_query"):
@@ -294,6 +296,13 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             max_wip_fetch = flow_cfg.get("wip_max_issues_for_replay", 500)
             execution_issues = fetch_issues_in_execution(
                 self.jira_client.jira_client, base_jql, execution_statuses, max_issues=max_wip_fetch
+            )
+            resolved_after_issues = fetch_issues_resolved_after(
+                self.jira_client.jira_client,
+                base_jql,
+                end_date,
+                completed_statuses,
+                max_issues=max_wip_fetch,
             )
 
         total_throughput, issues = fetch_flow_issues(
@@ -731,7 +740,12 @@ class JiraFlowMetricsReport(JiraSummaryBase):
         # Active WIP aging (open at period end)
         lines.extend(["", "### Active WIP aging (open at period end)", ""])
         if flow_cfg.get("wip_query"):
-            wip_aging_buckets = wip_aging_at_date(execution_issues, end_date, execution_statuses)
+            # Include both issues still in execution and issues resolved after period end
+            # so historical reports show full WIP at period end (not just still-open items)
+            wip_aging_candidates = list(execution_issues) + list(resolved_after_issues)
+            wip_aging_buckets = wip_aging_at_date(
+                wip_aging_candidates, end_date, execution_statuses
+            )
             total_aging = sum(
                 len(wip_aging_buckets.get(k, []))
                 for k in ("under_1_week", "1_to_2_weeks", "2_to_4_weeks", "over_4_weeks")
@@ -756,7 +770,7 @@ class JiraFlowMetricsReport(JiraSummaryBase):
                         link = f"[{entry['key']}]({server_url}/browse/{entry['key']})" if server_url else entry["key"]
                         lines.append(f"- {link} — {entry['summary']} — {format_duration_days(entry['age_days'])}")
                 lines.append("")
-                lines.append("*Based on issues currently in execution status with changelog; status at period end is derived from replay. Excludes issues that completed after the period end.*")
+                lines.append("*Status at period end from changelog replay. Includes issues still in execution and issues completed after the period end (up to flow_metrics.wip_max_issues_for_replay).*")
             else:
                 lines.append("No issues were in execution status at period end (or changelog replay had no matches).")
             lines.append("")

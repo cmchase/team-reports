@@ -91,7 +91,7 @@ flow_metrics:
   history_max_entries_per_cadence: 24
   segment_by: ["issuetype"]   # optional: ["issuetype", "component"]
   story_points_field: null    # e.g. "customfield_10016" for Cycle by size
-  wip_query: false            # true to show Current WIP (in execution) count
+  wip_query: true             # true: Current WIP, avg/peak WIP, Active WIP aging (open at period end)
 
 # Status filters for different report types  
 status_filters:
