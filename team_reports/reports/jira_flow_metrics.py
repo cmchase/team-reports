@@ -24,6 +24,11 @@ from team_reports.utils.jira import (
 from team_reports.utils.jira_summary_base import JiraSummaryBase
 
 
+def _format_pct(value: float, decimals: int = 1) -> str:
+    """Format percentage to fixed decimal places (avoids float noise like 64.69999999%)."""
+    return f"{round(value, decimals):.{decimals}f}"
+
+
 class JiraFlowMetricsReport(JiraSummaryBase):
     """Generate flow metrics (cycle time, lead time, throughput) for a date range."""
 
@@ -538,11 +543,11 @@ class JiraFlowMetricsReport(JiraSummaryBase):
                 "",
                 "### Cycle time distribution",
                 "",
-                f"- Under 1 week: {under_7} ({pct_under_7}%)",
-                f"- 1–2 weeks: {w1_w2} ({pct_w1_w2}%)",
-                f"- 2–4 weeks: {w2_w4} ({pct_w2_w4}%)",
-                f"- Over 4 weeks: {over_28} ({pct_over_28}%)",
-                f"- *{pct_within_2w}% of issues completed within 2 weeks (target: >= 70%).*",
+                f"- Under 1 week: {under_7} ({_format_pct(pct_under_7)}%)",
+                f"- 1–2 weeks: {w1_w2} ({_format_pct(pct_w1_w2)}%)",
+                f"- 2–4 weeks: {w2_w4} ({_format_pct(pct_w2_w4)}%)",
+                f"- Over 4 weeks: {over_28} ({_format_pct(pct_over_28)}%)",
+                f"- *{_format_pct(pct_within_2w)}% of issues completed within 2 weeks (target: >= 70%).*",
             ])
             long_tail_n = sum(1 for d in cycle_days_list if d > 56)
             if long_tail_n > 0:
@@ -565,7 +570,7 @@ class JiraFlowMetricsReport(JiraSummaryBase):
                 total_active = sum(active_days_list)
                 total_cycle = sum(cycle_days_for_efficiency)
                 efficiency = (total_active / total_cycle * 100) if total_cycle > 0 else 0
-                lines.append(f"- **Flow efficiency:** {efficiency:.0f}% (active execution vs. total cycle time).")
+                lines.append(f"- **Flow efficiency:** {_format_pct(efficiency)}% (active execution vs. total cycle time).")
                 if efficiency >= 60:
                     lines.append("- *Interpretation: good.*")
                 elif efficiency >= 40:
