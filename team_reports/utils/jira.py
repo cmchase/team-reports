@@ -8,7 +8,7 @@ building JQL queries, and fetching tickets with various filters.
 
 import os
 from typing import List, Dict, Any, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timedelta
 from jira import JIRA
 
 
@@ -533,6 +533,161 @@ def time_in_state_from_issue(
         return time_in_state
     except Exception:
         return None
+
+
+def _status_transitions(issue: Any) -> List[Tuple[datetime, str, str]]:
+    """Return sorted list of (transition_time, from_status, to_status) for status field."""
+    changelog = getattr(issue, "changelog", None)
+    if not changelog or not getattr(changelog, "histories", None):
+        return []
+    out: List[Tuple[datetime, str, str]] = []
+    for history in sorted(changelog.histories, key=lambda h: h.created):
+        for item in getattr(history, "items", []):
+            if getattr(item, "field", None) != "status":
+                continue
+            from_str = (getattr(item, "fromString", None) or "").strip()
+            to_str = (getattr(item, "toString", None) or "").strip()
+            if not to_str:
+                continue
+            try:
+                created_time = datetime.strptime(history.created[:19], "%Y-%m-%dT%H:%M:%S")
+            except ValueError:
+                continue
+            out.append((created_time, from_str, to_str))
+    return sorted(out, key=lambda x: x[0])
+
+
+def status_at_datetime(
+    issue: Any, dt: datetime, execution_statuses: List[str]
+) -> Optional[str]:
+    """
+    Return the status name at the given datetime from changelog.
+    Returns None if changelog missing or no status transitions.
+    """
+    transitions = _status_transitions(issue)
+    if not transitions:
+        return None
+    status = transitions[0][1]  # initial = fromString of first transition
+    for t, _from, to in transitions:
+        if t <= dt:
+            status = to
+        else:
+            break
+    return status
+
+
+def fetch_issues_in_execution(
+    jira_client: JIRA, base_jql: str, execution_statuses: List[str], max_issues: int = 500
+) -> List[Any]:
+    """
+    Fetch issues currently in an execution status (e.g. In Progress, Review) with changelog.
+    Used for daily WIP replay and active WIP aging at period end.
+    """
+    exec_jql = ", ".join(f'"{s}"' for s in execution_statuses)
+    jql = f"({base_jql}) AND status IN ({exec_jql})"
+    count_result = jira_client.search_issues(jql, maxResults=0)
+    total = getattr(count_result, "total", 0)
+    if total == 0:
+        return []
+    fetch_count = min(total, max_issues)
+    issues = jira_client.search_issues(jql, maxResults=fetch_count, expand="changelog")
+    return list(issues)
+
+
+def daily_wip_and_avg_peak(
+    completed_issues: List[Any],
+    execution_issues: List[Any],
+    start_date: str,
+    end_date: str,
+    execution_statuses: List[str],
+) -> Tuple[List[int], Optional[float], Optional[int]]:
+    """
+    Replay changelog to get WIP at end of each day in [start_date, end_date].
+    Returns (daily_wip_counts, average_wip, peak_wip).
+    Uses end-of-day (23:59:59) for each calendar day. Only issues with changelog are counted.
+    """
+    try:
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+    except ValueError:
+        return ([], None, None)
+    all_issues = list(completed_issues) + list(execution_issues)
+    if not all_issues:
+        return ([], None, None)
+    days: List[datetime] = []
+    d = start_dt
+    while d <= end_dt:
+        days.append(d.replace(hour=23, minute=59, second=59, microsecond=999999))
+        d = d + timedelta(days=1)
+    daily_counts: List[int] = []
+    for day_end in days:
+        count = 0
+        for issue in all_issues:
+            s = status_at_datetime(issue, day_end, execution_statuses)
+            if s and s in execution_statuses:
+                count += 1
+        daily_counts.append(count)
+    if not daily_counts:
+        return ([], None, None)
+    avg = sum(daily_counts) / len(daily_counts)
+    peak = max(daily_counts)
+    return (daily_counts, avg, peak)
+
+
+def wip_aging_at_date(
+    issues_with_changelog: List[Any],
+    end_date: str,
+    execution_statuses: List[str],
+) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    For each issue, if status at end_date was in execution, compute days in that state at end_date.
+    Returns buckets: "under_1_week", "1_to_2_weeks", "2_to_4_weeks", "over_4_weeks".
+    Each bucket is a list of {"key", "summary", "age_days"}.
+    """
+    try:
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(
+            hour=23, minute=59, second=59, microsecond=999999
+        )
+    except ValueError:
+        return {}
+    buckets: Dict[str, List[Dict[str, Any]]] = {
+        "under_1_week": [],
+        "1_to_2_weeks": [],
+        "2_to_4_weeks": [],
+        "over_4_weeks": [],
+    }
+    for issue in issues_with_changelog:
+        transitions = _status_transitions(issue)
+        if not transitions:
+            continue
+        status = transitions[0][1]
+        entered_at: Optional[datetime] = None
+        for t, _from, to in transitions:
+            if t <= end_dt:
+                status = to
+                if to in execution_statuses:
+                    entered_at = t
+                else:
+                    entered_at = None
+            else:
+                break
+        if status not in execution_statuses or entered_at is None:
+            continue
+        age_seconds = (end_dt - entered_at).total_seconds()
+        age_days = age_seconds / (24 * 3600)
+        key = getattr(issue, "key", "")
+        raw_summary = getattr(issue.fields, "summary", None) or ""
+        summary = (raw_summary[:60] + ("..." if len(raw_summary) > 60 else "")) if raw_summary else ""
+        entry = {"key": key, "summary": summary, "age_days": age_days}
+        if age_days < 7:
+            buckets["under_1_week"].append(entry)
+        elif age_days < 14:
+            buckets["1_to_2_weeks"].append(entry)
+        elif age_days < 28:
+            buckets["2_to_4_weeks"].append(entry)
+        else:
+            buckets["over_4_weeks"].append(entry)
+    return buckets
 
 
 def fetch_flow_issues(

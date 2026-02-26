@@ -13,10 +13,13 @@ from typing import Any, Dict, List, Optional, Tuple
 from team_reports.reports import flow_metrics_history
 from team_reports.utils.jira import (
     fetch_flow_issues,
+    fetch_issues_in_execution,
     flow_stats,
     cycle_and_lead_from_issue,
     format_duration_days,
     time_in_state_from_issue,
+    daily_wip_and_avg_peak,
+    wip_aging_at_date,
 )
 from team_reports.utils.jira_summary_base import JiraSummaryBase
 
@@ -275,11 +278,18 @@ class JiraFlowMetricsReport(JiraSummaryBase):
 
         flow_cfg = self._get_flow_config()
         wip_count: Optional[int] = None
+        execution_issues: List[Any] = []
+        avg_wip: Optional[float] = None
+        peak_wip: Optional[int] = None
         if flow_cfg.get("wip_query"):
             exec_jql = ", ".join(f'"{s}"' for s in execution_statuses)
             wip_jql = f"({base_jql}) AND status IN ({exec_jql})"
             wip_result = self.jira_client.jira_client.search_issues(wip_jql, maxResults=0)
             wip_count = getattr(wip_result, "total", 0)
+            max_wip_fetch = flow_cfg.get("wip_max_issues_for_replay", 500)
+            execution_issues = fetch_issues_in_execution(
+                self.jira_client.jira_client, base_jql, execution_statuses, max_issues=max_wip_fetch
+            )
 
         total_throughput, issues = fetch_flow_issues(
             self.jira_client.jira_client, jql, max_issues
@@ -291,6 +301,11 @@ class JiraFlowMetricsReport(JiraSummaryBase):
         except ValueError:
             start_dt = None
             end_dt = None
+
+        if flow_cfg.get("wip_query") and (issues or execution_issues):
+            _daily, avg_wip, peak_wip = daily_wip_and_avg_peak(
+                issues, execution_issues, start_date, end_date, execution_statuses
+            )
 
         issue_records: List[Dict[str, Any]] = []
         cycle_days_list: List[float] = []
@@ -424,8 +439,12 @@ class JiraFlowMetricsReport(JiraSummaryBase):
         else:
             if wip_count is None:
                 lines.append("- *Enable flow_metrics.wip_query in config to see current WIP and ratio.*")
-        lines.append("- // TODO: Average WIP during period: requires daily or period-level execution-status snapshot.")
-        lines.append("- // TODO: Peak WIP: requires single-day counts or changelog replay by day.")
+        if avg_wip is not None:
+            lines.append(f"- Average WIP during period: {avg_wip:.1f} (from daily execution-status replay).")
+        if peak_wip is not None:
+            lines.append(f"- Peak WIP: {peak_wip} (single-day max in period).")
+        if avg_wip is None and peak_wip is None and flow_cfg.get("wip_query"):
+            lines.append("- *Average/peak WIP: enable wip_query and ensure issues have changelog for replay.*")
         lines.append("")
         if prev_period is not None:
             prev_t = prev_period.get("throughput")
@@ -705,14 +724,40 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             lines.append("**By lead time:** No lead time data.")
 
         # Active WIP aging (open at period end)
-        lines.extend([
-            "",
-            "### Active WIP aging (open at period end)",
-            "",
-            "// TODO: active WIP aging requires open issue snapshot at period end date",
-            "*This would list issues in In Progress or Review at the end of the period, grouped by how long they have been in that state.*",
-            "",
-        ])
+        lines.extend(["", "### Active WIP aging (open at period end)", ""])
+        if flow_cfg.get("wip_query"):
+            wip_aging_buckets = wip_aging_at_date(execution_issues, end_date, execution_statuses)
+            total_aging = sum(
+                len(wip_aging_buckets.get(k, []))
+                for k in ("under_1_week", "1_to_2_weeks", "2_to_4_weeks", "over_4_weeks")
+            )
+            if total_aging > 0:
+                under = len(wip_aging_buckets.get("under_1_week", []))
+                w1_w2 = len(wip_aging_buckets.get("1_to_2_weeks", []))
+                w2_w4 = len(wip_aging_buckets.get("2_to_4_weeks", []))
+                over4 = len(wip_aging_buckets.get("over_4_weeks", []))
+                lines.append(f"Issues in execution at period end ({end_date}): **{total_aging}**")
+                lines.append("")
+                lines.append(f"- Under 1 week: {under}")
+                lines.append(f"- 1–2 weeks: {w1_w2}")
+                lines.append(f"- 2–4 weeks: {w2_w4}")
+                lines.append(f"- Over 4 weeks: {over4}")
+                over4_list = wip_aging_buckets.get("over_4_weeks", [])
+                if over4_list:
+                    lines.append("")
+                    lines.append("**Over 4 weeks in execution (consider unblocking or reprioritising):**")
+                    server_url = (self.jira_client.config or {}).get("server")
+                    for entry in over4_list:
+                        link = f"[{entry['key']}]({server_url}/browse/{entry['key']})" if server_url else entry["key"]
+                        lines.append(f"- {link} — {entry['summary']} — {format_duration_days(entry['age_days'])}")
+                lines.append("")
+                lines.append("*Based on issues currently in execution status with changelog; status at period end is derived from replay. Excludes issues that completed after the period end.*")
+            else:
+                lines.append("No issues were in execution status at period end (or changelog replay had no matches).")
+            lines.append("")
+        else:
+            lines.append("*Enable flow_metrics.wip_query to fetch issues in execution; aging is derived from changelog at period end.*")
+            lines.append("")
 
         # Definitions (glossary)
         lines.extend([
