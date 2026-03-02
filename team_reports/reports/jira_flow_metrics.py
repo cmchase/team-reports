@@ -59,6 +59,32 @@ class JiraFlowMetricsReport(JiraSummaryBase):
         """Return flow_metrics config with defaults."""
         return self.config.get("flow_metrics") or {}
 
+    def _apply_flow_exclusions(self, base_jql: str, flow_cfg: Dict[str, Any]) -> str:
+        """
+        Apply configurable exclusions to base JQL for flow metrics.
+        Uses exclude_issue_types and exclude_labels from flow_metrics config.
+        Backward compatibility: if include_epics is False and exclude_issue_types not set, excludes Epic.
+        """
+        conditions: List[str] = []
+        # Issue types to exclude
+        exclude_types = flow_cfg.get("exclude_issue_types")
+        if exclude_types is None and not flow_cfg.get("include_epics", True):
+            exclude_types = ["Epic"]
+        if exclude_types:
+            types_jql = ", ".join(f'"{t}"' for t in exclude_types if t)
+            if types_jql:
+                conditions.append(f"issuetype NOT IN ({types_jql})")
+        # Labels to exclude (issues that have any of these labels are excluded)
+        # Use (NOT labels IN (...) OR labels is EMPTY) so issues with no labels are included
+        exclude_labels = flow_cfg.get("exclude_labels") or []
+        if exclude_labels:
+            labels_jql = ", ".join(f'"{l}"' for l in exclude_labels if l)
+            if labels_jql:
+                conditions.append(f"(NOT labels IN ({labels_jql}) OR labels is EMPTY)")
+        if not conditions:
+            return base_jql
+        return f"({base_jql}) AND " + " AND ".join(conditions)
+
     def _focus_suggestion(
         self,
         cycle_stats: Dict[str, float],
@@ -275,6 +301,8 @@ class JiraFlowMetricsReport(JiraSummaryBase):
         completed_statuses = status_lists["completed"]
 
         base_jql = " ".join((self.base_jql or "project is not empty").strip().split())
+        flow_cfg = self._get_flow_config()
+        base_jql = self._apply_flow_exclusions(base_jql, flow_cfg)
         completed_jql = ", ".join(f'"{s}"' for s in completed_statuses)
         jql = (
             f'({base_jql}) AND status IN ({completed_jql}) '
@@ -282,7 +310,6 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             f'ORDER BY resolutiondate DESC'
         )
 
-        flow_cfg = self._get_flow_config()
         wip_count: Optional[int] = None
         execution_issues: List[Any] = []
         resolved_after_issues: List[Any] = []

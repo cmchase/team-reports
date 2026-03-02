@@ -92,6 +92,9 @@ flow_metrics:
   segment_by: ["issuetype"]   # optional: ["issuetype", "component"]
   story_points_field: null    # e.g. "customfield_10016" for Cycle by size
   wip_query: true             # true: Current WIP, avg/peak WIP, Active WIP aging (open at period end)
+  # Exclusions applied to all flow-metrics JQL (throughput, cycle, lead, WIP, aging)
+  exclude_issue_types: ["Epic"]   # issue types to exclude (e.g. Epic, Initiative)
+  exclude_labels: ["exclude_from_reporting"]   # issues with any of these labels are excluded
 
 # Status filters for different report types  
 status_filters:
