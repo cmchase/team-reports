@@ -2,13 +2,16 @@
 """
 Flow metrics report: cycle time, lead time, throughput, and predictability.
 
-Uses Jira issues resolved in a date range; cycle = first execution status -> completed,
-lead = created -> completed. Reads status_filters (execution, completed) from Jira config.
+Cycle time is the sum of time (in days) each issue spent in execution statuses (e.g. In Progress,
+Review) until its first transition to a completed status. Only contiguous time actually in
+execution is counted; time in To Do, Backlog, or other statuses is excluded. Lead time is
+issue created to first transition into a completed status. Reads status_filters (execution,
+completed) from Jira config.
 """
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from team_reports.reports import flow_metrics_history
 from team_reports.utils.jira import (
@@ -525,7 +528,7 @@ class JiraFlowMetricsReport(JiraSummaryBase):
         lines.extend([
             "",
             "### Cycle time (execution → done)",
-            "Time from first transition into an execution status (e.g. In Progress, Review) to first transition into a completed status.",
+            "Sum of time spent in execution statuses (e.g. In Progress, Review) until first transition to a completed status. Time in To Do, Backlog, etc. is excluded.",
             "",
         ])
         if cycle_stats["count"] == 0:
@@ -742,27 +745,37 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             lines.append(f"- {a}")
         lines.append("")
 
-        # Slowest items section
+        # Slowest items section: deduplicate so each issue appears once with both cycle and lead
         server_url = self.jira_client.get_server_url() or ""
         lines.extend(["", "### Slowest items"])
-        if by_cycle:
-            lines.append("**By cycle time:**")
-            for r in by_cycle[:3]:
+        seen_keys: Set[str] = set()
+        slowest_merged: List[Dict[str, Any]] = []
+        for r in by_cycle[:3] + by_lead[:3]:
+            k = r["key"]
+            if k not in seen_keys:
+                seen_keys.add(k)
+                slowest_merged.append(r)
+        # Sort by max of cycle/lead so slowest appear first
+        def _slowest_sort_key(rec: Dict[str, Any]) -> float:
+            c = rec.get("cycle_days") or 0
+            l = rec.get("lead_days") or 0
+            return max(c, l)
+        slowest_merged.sort(key=_slowest_sort_key, reverse=True)
+        if slowest_merged:
+            lines.append("*Cycle time = sum of time in execution statuses only. Lead time = created to first move to done.*")
+            lines.append("")
+            for r in slowest_merged:
                 link = f"[{r['key']}]({server_url}/browse/{r['key']})" if server_url else r["key"]
-                lines.append(f"- {link} — {r['summary']} — {format_duration_days(r['cycle_days'])}")
-                typ = self._classify_slowest_item(r["summary"], r["key"], r.get("cycle_days"), r.get("lead_days"), by_lead=False)
+                cycle_str = format_duration_days(r["cycle_days"]) if r.get("cycle_days") is not None else "—"
+                lead_str = format_duration_days(r["lead_days"]) if r.get("lead_days") is not None else "—"
+                lines.append(f"- {link} — {r['summary']}")
+                lines.append(f"  Cycle: {cycle_str} | Lead: {lead_str}")
+                typ = self._classify_slowest_item(
+                    r["summary"], r["key"], r.get("cycle_days"), r.get("lead_days"), by_lead=False
+                )
                 lines.append(f"  Type: {typ}")
         else:
-            lines.append("**By cycle time:** No cycle time outliers.")
-        if by_lead:
-            lines.append("**By lead time:**")
-            for r in by_lead[:3]:
-                link = f"[{r['key']}]({server_url}/browse/{r['key']})" if server_url else r["key"]
-                lines.append(f"- {link} — {r['summary']} — {format_duration_days(r['lead_days'])}")
-                typ = self._classify_slowest_item(r["summary"], r["key"], r.get("cycle_days"), r.get("lead_days"), by_lead=True)
-                lines.append(f"  Type: {typ}")
-        else:
-            lines.append("**By lead time:** No lead time data.")
+            lines.append("No cycle or lead time data for slowest items.")
 
         # Active WIP aging (open at period end)
         lines.extend(["", "### Active WIP aging (open at period end)", ""])
@@ -809,7 +822,7 @@ class JiraFlowMetricsReport(JiraSummaryBase):
         lines.extend([
             "",
             "### Definitions",
-            "- **Cycle time:** First move into an execution status (e.g. In Progress, Review) → first move to a completed status.",
+            "- **Cycle time:** Sum of time the issue spent in execution statuses (e.g. In Progress, Review) until first transition to completed. Time in To Do, Backlog, etc. is excluded.",
             "- **Lead time:** Issue created → first move to a completed status.",
             "- **Throughput:** Number of issues completed in this period (resolved in date range).",
             "",

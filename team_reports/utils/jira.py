@@ -414,18 +414,20 @@ def cycle_and_lead_from_issue(
 ) -> Tuple[Optional[float], Optional[float]]:
     """
     Compute cycle time and lead time in days from a Jira issue with changelog.
-    Cycle: first transition into any execution status -> first transition into any completed status.
-    Lead: issue created -> first transition into any completed status.
+    Cycle time: sum of time in execution statuses until first transition to completed (excludes time in To Do, Backlog, etc.).
+    Lead: issue created to first transition into a completed status (or resolutiondate if no changelog).
     Returns (cycle_days, lead_days); either may be None if not computable.
     """
     try:
         created_str = getattr(issue.fields, "created", None) or ""
+        created_dt: Optional[datetime] = None
         if created_str:
-            created_dt = datetime.strptime(created_str[:19], "%Y-%m-%dT%H:%M:%S")
-        else:
-            created_dt = None
+            try:
+                created_dt = datetime.strptime(created_str[:19], "%Y-%m-%dT%H:%M:%S")
+            except ValueError:
+                pass
         resolution_str = getattr(issue.fields, "resolutiondate", None) or ""
-        resolution_dt = None
+        resolution_dt: Optional[datetime] = None
         if resolution_str:
             try:
                 resolution_dt = datetime.strptime(resolution_str[:19], "%Y-%m-%dT%H:%M:%S")
@@ -437,31 +439,24 @@ def cycle_and_lead_from_issue(
                 lead_days = (resolution_dt - created_dt).total_seconds() / (24 * 3600)
                 return (None, lead_days)
             return (None, None)
+        cycle_days = cycle_time_execution_sum_days(issue, execution_statuses, completed_statuses)
         histories = sorted(changelog.histories, key=lambda h: h.created)
-        first_execution = None
-        first_done = None
+        first_done: Optional[datetime] = None
         for history in histories:
             for item in getattr(history, "items", []):
                 if getattr(item, "field", None) != "status":
                     continue
                 to_str = (getattr(item, "toString", None) or "").strip()
-                if not to_str:
+                if to_str not in completed_statuses or not to_str:
                     continue
                 try:
                     created_time = datetime.strptime(history.created[:19], "%Y-%m-%dT%H:%M:%S")
                 except ValueError:
                     continue
-                if to_str in execution_statuses and first_execution is None:
-                    first_execution = created_time
-                if to_str in completed_statuses and first_done is None:
-                    first_done = created_time
-                if first_execution and first_done:
-                    break
-            if first_execution and first_done:
+                first_done = created_time
                 break
-        cycle_days = None
-        if first_execution and first_done and first_done > first_execution:
-            cycle_days = (first_done - first_execution).total_seconds() / (24 * 3600)
+            if first_done is not None:
+                break
         lead_days = None
         if first_done and created_dt:
             lead_days = (first_done - created_dt).total_seconds() / (24 * 3600)
@@ -555,6 +550,56 @@ def _status_transitions(issue: Any) -> List[Tuple[datetime, str, str]]:
                 continue
             out.append((created_time, from_str, to_str))
     return sorted(out, key=lambda x: x[0])
+
+
+def cycle_time_execution_sum_days(
+    issue: Any,
+    execution_statuses: List[str],
+    completed_statuses: List[str],
+) -> Optional[float]:
+    """
+    Compute cycle time as the sum of time (in days) the issue spent in execution statuses
+    until its first transition to a completed status.
+
+    This measures only contiguous time actually spent in execution (e.g. In Progress, Review).
+    Time spent in To Do, Backlog, or other non-execution statuses is not counted. If an issue
+    moves In Progress → To Do → In Progress → Done, only the two In Progress segments are summed.
+
+    Returns None if the issue never reached a completed status, or if changelog is missing.
+    """
+    try:
+        created_str = getattr(issue.fields, "created", None) or ""
+        created_dt: Optional[datetime] = None
+        if created_str:
+            try:
+                created_dt = datetime.strptime(created_str[:19], "%Y-%m-%dT%H:%M:%S")
+            except ValueError:
+                pass
+        transitions = _status_transitions(issue)
+        if not transitions:
+            return None
+        first_done_time: Optional[datetime] = None
+        for t, _from, to in transitions:
+            if to in completed_statuses:
+                first_done_time = t
+                break
+        if first_done_time is None:
+            return None
+        prev_time: Optional[datetime] = created_dt if created_dt is not None else transitions[0][0]
+        cycle_sum = 0.0
+        for t, from_str, to_str in transitions:
+            if t > first_done_time:
+                break
+            if from_str in execution_statuses and prev_time is not None:
+                seg_seconds = (t - prev_time).total_seconds()
+                if seg_seconds > 0:
+                    cycle_sum += seg_seconds / (24 * 3600)
+            prev_time = t
+            if to_str in completed_statuses:
+                break
+        return cycle_sum if cycle_sum >= 0 else None
+    except Exception:
+        return None
 
 
 def status_at_datetime(
