@@ -17,6 +17,7 @@ load_dotenv()
 from team_reports.reports.jira_weekly import WeeklyJiraSummary
 from team_reports.reports.jira_quarterly import QuarterlyTeamSummary
 from team_reports.reports.jira_flow_metrics import JiraFlowMetricsReport
+from team_reports.reports.sizing_analysis import SizingAnalysisReport
 from team_reports.reports.github_weekly import WeeklyGitHubSummary
 from team_reports.reports.github_quarterly import GitHubQuarterlySummary
 from team_reports.reports.engineer_performance import EngineerQuarterlyPerformance
@@ -223,6 +224,54 @@ def jira_flow_metrics(days: Optional[int], quarter: Optional[int], year: Optiona
         click.echo(click.style("✅ Flow metrics report generated successfully!", fg='green'))
         click.echo(f"📄 Report saved to: {filepath}")
         
+    except Exception as e:
+        import traceback
+        click.echo(click.style(f"❌ Error: {e}", fg='red'), err=True)
+        traceback.print_exc()
+        sys.exit(1)
+
+
+@jira.command('sizing-analysis')
+@click.option('--days', type=int, default=270, help='Analysis window in days (default: 270 = ~9 months)')
+@click.option('--start', 'start_date', type=str, default=None, help='Start date YYYY-MM-DD')
+@click.option('--end', 'end_date', type=str, default=None, help='End date YYYY-MM-DD')
+@click.option('--max-issues', type=int, default=500, help='Max issues to fetch (default: 500)')
+@click.option('--save-baseline', type=str, default=None, help='Save JSON baseline to path (e.g. Reports/Sizing_Baseline_9mo.json)')
+@click.option('--config', default='config/jira_config.yaml', help='Path to Jira configuration file')
+@click.option('--jira-server', help='Jira server URL (overrides environment)')
+@click.option('--jira-email', help='Jira email (overrides environment)')
+@click.option('--jira-token', help='Jira API token (overrides environment)')
+def jira_sizing_analysis(days: int, start_date: Optional[str], end_date: Optional[str],
+                         max_issues: int, save_baseline: Optional[str], config: str,
+                         jira_server: Optional[str], jira_email: Optional[str], jira_token: Optional[str]):
+    """Generate sizing analysis: time-to-completion by size (story points) over a date range.
+
+    Requires flow_metrics.story_points_field in config. Optional team_sizing maps points to
+    size labels (e.g. t-shirt names). Use --days 270 for ~9 months. Optionally --save-baseline.
+    
+    Examples:
+        team-reports jira sizing-analysis
+        team-reports jira sizing-analysis --days 270 --save-baseline Reports/Sizing_Baseline_9mo.json
+        team-reports jira sizing-analysis --start 2025-01-01 --end 2025-09-30
+    """
+    try:
+        if start_date and end_date:
+            start, end = start_date, end_date
+        else:
+            start, end = get_date_range_for_days(days)
+        click.echo(f"Generating sizing analysis: {start} to {end} (max_issues={max_issues})...")
+        report = SizingAnalysisReport(
+            config_file=config,
+            jira_server=jira_server,
+            jira_email=jira_email,
+            jira_token=jira_token,
+        )
+        summary = report.generate_report(start, end, max_issues=max_issues, save_baseline_path=save_baseline)
+        from team_reports.utils.report import save_report
+        filename = f"Sizing_Analysis_{start}_to_{end}.md"
+        filepath = save_report(summary, filename)
+        click.echo(click.style("✅ Sizing analysis generated!", fg='green'))
+        click.echo(f"📄 Report saved to: {filepath}")
     except Exception as e:
         import traceback
         click.echo(click.style(f"❌ Error: {e}", fg='red'), err=True)

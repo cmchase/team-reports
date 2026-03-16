@@ -26,6 +26,13 @@ from team_reports.utils.jira import (
     wip_aging_at_date,
 )
 from team_reports.utils.jira_summary_base import JiraSummaryBase
+from team_reports.utils.sizing import (
+    story_points_to_size,
+    get_ordered_sizes_for_table,
+    flag_possibly_missized,
+    median as sizing_median,
+    DEFAULT_SIZE_LABELS,
+)
 
 
 def _format_pct(value: float, decimals: int = 1) -> str:
@@ -49,6 +56,7 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             jira_email=jira_email,
             jira_token=jira_token,
         )
+        self._config_file = config_file
 
     def _get_status_lists(self) -> Dict[str, List[str]]:
         """Return execution and completed status lists from config."""
@@ -220,11 +228,12 @@ class JiraFlowMetricsReport(JiraSummaryBase):
         return (self._get_flow_config().get("cadence")) or "custom"
 
     def _resolve_history_path(self, history_file: str) -> str:
-        """Resolve relative path from cwd so Reports/... works when run from repo root."""
+        """Resolve path: absolute unchanged; relative resolved from config file dir (stable when run via MCP)."""
         p = Path(history_file)
         if p.is_absolute():
             return history_file
-        return str(Path.cwd() / p)
+        config_dir = Path(self._config_file).resolve().parent
+        return str(config_dir / p)
 
     def _segment_table(
         self,
@@ -361,6 +370,12 @@ class JiraFlowMetricsReport(JiraSummaryBase):
         has_created_dates = True
         segment_by = flow_cfg.get("segment_by") or []
         story_points_field = flow_cfg.get("story_points_field")
+        team_sizing = self.config.get("team_sizing") or {}
+        size_labels = flow_cfg.get("size_labels")
+        if size_labels is None and team_sizing and set(team_sizing.keys()) <= set(DEFAULT_SIZE_LABELS.keys()):
+            size_labels = DEFAULT_SIZE_LABELS
+        size_display_order = flow_cfg.get("size_display_order")
+        use_story_points_sizing = bool(story_points_field)
         segment_issuetype: Dict[str, List[Tuple[Optional[float], Optional[float]]]] = {}
         segment_component: Dict[str, List[Tuple[Optional[float], Optional[float]]]] = {}
         segment_size: Dict[str, List[Tuple[Optional[float], Optional[float]]]] = {}
@@ -372,11 +387,24 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             key = getattr(issue, "key", "")
             raw_summary = getattr(issue.fields, "summary", None) or ""
             summary = raw_summary[:60] + ("..." if len(raw_summary) > 60 else "")
+            story_points_val: Optional[float] = None
+            size_label = "Unestimated"
+            if story_points_field:
+                val = getattr(issue.fields, story_points_field, None)
+                if val is not None and isinstance(val, (int, float)):
+                    story_points_val = float(val)
+                if use_story_points_sizing:
+                    size_label = story_points_to_size(
+                        story_points_val, team_sizing or None, size_labels
+                    )
             issue_records.append({
                 "key": key,
                 "summary": summary,
                 "cycle_days": cycle_days,
                 "lead_days": lead_days,
+                "story_points": story_points_val,
+                "size_label": size_label,
+                "t_shirt_size": size_label,
             })
             if cycle_days is not None:
                 cycle_days_list.append(cycle_days)
@@ -414,22 +442,27 @@ class JiraFlowMetricsReport(JiraSummaryBase):
                     comp_name = comps[0].name if comps and hasattr(comps[0], "name") else "No component"
                     segment_component.setdefault(comp_name, []).append((cycle_days, lead_days))
                 if story_points_field:
-                    val = getattr(issue.fields, story_points_field, None)
-                    if val is None or (isinstance(val, (int, float)) and val == 0):
-                        bucket = "Unestimated"
-                    elif isinstance(val, (int, float)):
-                        if val <= 2:
-                            bucket = "Small"
-                        elif val <= 5:
-                            bucket = "Medium"
-                        else:
-                            bucket = "Large"
-                    else:
-                        bucket = "Unestimated"
-                    segment_size.setdefault(bucket, []).append((cycle_days, lead_days))
+                    segment_size.setdefault(size_label, []).append((cycle_days, lead_days))
 
         cycle_stats = flow_stats(cycle_days_list)
         lead_stats = flow_stats(lead_days_list)
+        # Per-size median cycle for possibly-mis-sized detection (any story-point sizing)
+        size_median_cycle: Dict[str, float] = {}
+        possibly_missized: List[Dict[str, Any]] = []
+        if use_story_points_sizing and segment_size:
+            flow_cfg_missized = flow_cfg.get("possibly_missized") or {}
+            min_baseline = flow_cfg_missized.get("min_issues_for_baseline", 2)
+            cycle_multiple = flow_cfg_missized.get("cycle_multiple_threshold", 2.0)
+            for label, pairs in segment_size.items():
+                cycle_vals = [p[0] for p in pairs if p[0] is not None]
+                if len(cycle_vals) >= min_baseline:
+                    size_median_cycle[label] = sizing_median(cycle_vals)
+            possibly_missized = flag_possibly_missized(
+                issue_records, size_median_cycle,
+                min_issues_for_baseline=min_baseline,
+                cycle_multiple_threshold=cycle_multiple,
+                size_key="size_label",
+            )
         throughput_note = str(total_throughput)
         if total_throughput > len(issues):
             throughput_note += (
@@ -682,8 +715,11 @@ class JiraFlowMetricsReport(JiraSummaryBase):
             lines.extend(self._segment_table(segment_component, first_column="Component"))
             lines.append("")
         if story_points_field and segment_size:
-            size_order = ["Unestimated", "Small", "Medium", "Large"]
-            lines.extend(["", "### Cycle by size", ""])
+            size_order = get_ordered_sizes_for_table(
+                team_sizing or None, size_labels, size_display_order,
+                observed_keys=list(segment_size.keys()),
+            )
+            lines.extend(["", "### Cycle by size (story points)", ""])
             lines.extend(self._segment_table(segment_size, order_keys=size_order, first_column="Size"))
             lines.append("")
 
@@ -776,6 +812,27 @@ class JiraFlowMetricsReport(JiraSummaryBase):
                 lines.append(f"  Type: {typ}")
         else:
             lines.append("No cycle or lead time data for slowest items.")
+
+        # Possibly mis-sized (cycle time far above median for that size)
+        if use_story_points_sizing and possibly_missized:
+            lines.extend(["", "### Possibly mis-sized", ""])
+            lines.append("*Items whose cycle time is well above the median for their size this period. Consider whether they were under-sized or had scope growth.*")
+            lines.append("")
+            server_url = self.jira_client.get_server_url() or ""
+            for r in possibly_missized[:10]:
+                link = f"[{r['key']}]({server_url}/browse/{r['key']})" if server_url else r["key"]
+                cycle_str = format_duration_days(r["cycle_days"]) if r.get("cycle_days") is not None else "—"
+                baseline_str = format_duration_days(r.get("baseline_median_cycle_days", 0))
+                mult = r.get("multiple", 0)
+                lines.append(f"- {link} — {r['summary']}")
+                lines.append(f"  Size: {r.get('size_label', r.get('t_shirt_size', '?'))} | Cycle: {cycle_str} (median for size: {baseline_str}, ~{mult}×)")
+            if len(possibly_missized) > 10:
+                lines.append(f"- *... and {len(possibly_missized) - 10} more.*")
+            lines.append("")
+        elif use_story_points_sizing:
+            lines.extend(["", "### Possibly mis-sized", ""])
+            lines.append("*No issues flagged this period. Mis-sized detection compares cycle time to the median for each size (story points).*")
+            lines.append("")
 
         # Active WIP aging (open at period end)
         lines.extend(["", "### Active WIP aging (open at period end)", ""])
