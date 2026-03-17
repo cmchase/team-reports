@@ -36,9 +36,10 @@ def initialize_jira_client() -> JIRA:
         raise ValueError("Missing required environment variables: JIRA_SERVER, JIRA_EMAIL, JIRA_API_TOKEN")
     
     try:
+        # Use basic_auth (email + API token) for Atlassian Cloud; token_auth can trigger 403 "Connect Session Auth Token"
         jira_client = JIRA(
             server=server,
-            token_auth=api_token
+            basic_auth=(email.strip(), api_token.strip()),
         )
         print("✅ Connected to Jira")
         return jira_client
